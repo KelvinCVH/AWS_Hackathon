@@ -11,7 +11,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: AnalyzeFunction
-      Handler: detector.app.lambda_handler
+      Handler: detector.text-detector.lambda_handler
       Runtime: python3.11
       Policies:
       - AmazonDynamoDBFullAccess
@@ -33,8 +33,55 @@ Resources:
           TABLE_NAME:
             Ref: ContentDetectionsTable
           BEDROCK_REGION: us-east-1
+          DATA_REGION: ap-southeast-1
     Metadata:
       SamResourceId: AnalyzeFunction
+  DocumentDetectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DocumentDetectorFunction
+      Handler: detector.document-detector.lambda_handler
+      Runtime: python3.11
+      Timeout: 300
+      MemorySize: 1024
+      Policies:
+      - AmazonDynamoDBFullAccess
+      - CloudWatchLogsFullAccess
+      - ComprehendReadOnly
+      - Statement:
+          Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          Resource: '*'
+      - Statement:
+          Effect: Allow
+          Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:HeadObject
+          Resource:
+          - arn:aws:s3:::ai-detection-documents/*
+      - Statement:
+          Effect: Allow
+          Action:
+          - textract:DetectDocumentText
+          - textract:AnalyzeDocument
+          Resource: '*'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /process-document
+            Method: post
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: ContentDetectionsTable
+          BEDROCK_REGION: us-east-1
+          DATA_REGION: ap-southeast-1
+          BUCKET_NAME: ai-detection-documents
+    Metadata:
+      SamResourceId: DocumentDetectorFunction
   ContentDetectionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -52,6 +99,22 @@ Resources:
       BillingMode: PAY_PER_REQUEST
 Outputs:
   ApiUrl:
-    Description: API Gateway endpoint URL for Analyze function
+    Description: API Gateway endpoint URL for Text Analyze function
     Value:
       Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze
+  DocumentDetectorApiUrl:
+    Description: API Gateway endpoint URL for Document Detector function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/process-document
+  DynamoDBTableName:
+    Description: DynamoDB table name for storing analysis results
+    Value:
+      Ref: ContentDetectionsTable
+  TextDetectorFunctionName:
+    Description: Lambda function name for text detection
+    Value:
+      Ref: AnalyzeFunction
+  DocumentDetectorFunctionName:
+    Description: Lambda function name for document detection
+    Value:
+      Ref: DocumentDetectorFunction
