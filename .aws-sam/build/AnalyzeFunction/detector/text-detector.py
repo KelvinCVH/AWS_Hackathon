@@ -343,49 +343,87 @@ def analyze_text(text, comprehend, bedrock):
     return sentiment, key_phrases, final_score, explanation
 
 
+# ✅ Add global headers for CORS
+HEADERS = {
+    "Access-Control-Allow-Origin": "http://localhost:5173",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "OPTIONS,POST"
+}
+
+
 def lambda_handler(event, context):
-    # Parse input text from API Gateway event
-    body = json.loads(event.get("body", "{}"))
-    text = body.get("text", "")
+    print(f"Event: {json.dumps(event)}")  # Debug log
 
-    if not text:
-        return {"statusCode": 400, "body": json.dumps({"error": "No text provided"})}
+    # ✅ Handle CORS Preflight (OPTIONS request)
+    if event.get("httpMethod") == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": HEADERS,
+            "body": json.dumps({"message": "CORS preflight OK"})
+        }
 
-    if len(text) < 10:
-        return {"statusCode": 400, "body": json.dumps({"error": "Text too short for meaningful analysis"})}
-
-    dynamodb, comprehend, bedrock = get_clients()
-    table = dynamodb.Table(TABLE_NAME)
-
-    sentiment, key_phrases, ai_score, explanation = analyze_text(text, comprehend, bedrock)
-
-    # Build enhanced item for DynamoDB
-    item = {
-        "id": str(uuid.uuid4()),
-        "timestamp": str(int(time.time())),
-        "input_text": text[:1000],  # Truncate very long texts for storage
-        "ai_score": ai_score,
-        "explanation": explanation[:500],  # Truncate long explanations
-        "sentiment": sentiment,
-        "key_phrases": key_phrases[:10],  # Limit key phrases
-        "text_length": len(text),
-        "analysis_version": "enhanced_v1"
-    }
-    
+    # Normal POST request
     try:
-        table.put_item(Item=item)
-    except Exception as e:
-        print(f"[WARN] Failed to write to DynamoDB: {e}")
+        body = json.loads(event.get("body", "{}"))
+        text = body.get("text", "")
 
-    # Return enhanced API Gateway response
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "ai_score": ai_score,
-            "explanation": explanation,
+        if not text:
+            return {
+                "statusCode": 400,
+                "headers": HEADERS,
+                "body": json.dumps({"error": "No text provided"})
+            }
+
+        if len(text) < 10:
+            return {
+                "statusCode": 400,
+                "headers": HEADERS,
+                "body": json.dumps({"error": "Text too short for meaningful analysis"})
+            }
+
+        # Get AWS clients
+        dynamodb, comprehend, bedrock = get_clients()
+        table = dynamodb.Table(TABLE_NAME)
+
+        # Run analysis
+        sentiment, key_phrases, ai_score, explanation = analyze_text(text, comprehend, bedrock)
+
+        # Save to DynamoDB
+        item = {
+            "id": str(uuid.uuid4()),
+            "timestamp": str(int(time.time())),
+            "input_text": text[:1000],
+            "ai_score": Decimal(str(ai_score)),
+            "explanation": explanation[:500],
             "sentiment": sentiment,
-            "key_phrases": key_phrases,
-            "confidence": "high" if ai_score < 20 or ai_score > 80 else "medium",
-            "text_length": len(text)
-        }),
-    }
+            "key_phrases": key_phrases[:10],
+            "text_length": len(text),
+            "analysis_version": "enhanced_v1"
+        }
+
+        try:
+            table.put_item(Item=item)
+        except Exception as e:
+            print(f"[WARN] DynamoDB write failed: {e}")
+
+        # Always return CORS headers in response
+        return {
+            "statusCode": 200,
+            "headers": HEADERS,
+            "body": json.dumps({
+                "ai_score": ai_score,
+                "explanation": explanation,
+                "sentiment": sentiment,
+                "key_phrases": key_phrases,
+                "confidence": "high" if ai_score < 20 or ai_score > 80 else "medium",
+                "text_length": len(text)
+            })
+        }
+
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return {
+            "statusCode": 500,
+            "headers": HEADERS,
+            "body": json.dumps({"error": "Internal server error"})
+        }
