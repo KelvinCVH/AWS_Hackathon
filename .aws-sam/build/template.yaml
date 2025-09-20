@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI Content Detector - Hackathon Project
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.11
+    MemorySize: 512
+Resources:
+  AnalyzeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: AnalyzeFunction
+      Handler: detector.app.lambda_handler
+      Runtime: python3.11
+      Policies:
+      - AmazonDynamoDBFullAccess
+      - CloudWatchLogsFullAccess
+      - ComprehendReadOnly
+      - Statement:
+          Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          Resource: '*'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /analyze
+            Method: post
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: ContentDetectionsTable
+          BEDROCK_REGION: us-east-1
+    Metadata:
+      SamResourceId: AnalyzeFunction
+  ContentDetectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ContentDetections
+      AttributeDefinitions:
+      - AttributeName: id
+        AttributeType: S
+      - AttributeName: timestamp
+        AttributeType: S
+      KeySchema:
+      - AttributeName: id
+        KeyType: HASH
+      - AttributeName: timestamp
+        KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL for Analyze function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze
