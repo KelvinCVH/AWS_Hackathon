@@ -27,16 +27,22 @@
 
       <button
         @click="analyzeText"
-        :disabled="!inputText.trim() || isAnalyzing"
+        :disabled="!inputText.trim() || isAnalyzing || inputText.trim().split(/\s+/).length < 5"
         :class="[
           'w-full py-3 px-6 rounded-lg font-medium transition-colors',
-          !inputText.trim() || isAnalyzing
+          !inputText.trim() || isAnalyzing || inputText.trim().split(/\s+/).length < 5
             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
             : 'bg-[#FF9900] text-white hover:bg-[#E68A00] shadow-lg'
         ]"
       >
         {{ isAnalyzing ? 'Analyzing...' : 'Analyze Text' }}
       </button>
+      
+      <!-- Validation message -->
+      <div v-if="inputText.trim() && inputText.trim().split(/\s+/).length < 5" 
+           class="text-sm text-red-600 text-center">
+        Please enter at least 5 words for meaningful analysis
+      </div>
     </div>
 
     <!-- RIGHT: Results -->
@@ -52,10 +58,26 @@
       <div v-if="isAnalyzing" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF9900] mx-auto mb-4"></div>
         <p class="text-gray-600">Analyzing your text...</p>
+        <p class="text-sm text-gray-500 mt-2">This may take a few seconds</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div class="flex items-center">
+          <div class="text-red-600 mr-3">⚠️</div>
+          <div>
+            <h4 class="text-red-800 font-medium">Analysis Failed</h4>
+            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+            <button @click="retryAnalysis" 
+                    class="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded">
+              Try Again
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Results -->
-      <div v-if="hasResults && !isAnalyzing" class="space-y-6">
+      <div v-if="hasResults && !isAnalyzing && !error" class="space-y-6">
         <div class="text-center">
           <div class="text-6xl font-bold mb-2" :class="resultColor">
             {{ Math.round(results.ai_score) }}%
@@ -77,8 +99,8 @@
         <!-- Summary -->
         <div class="bg-white rounded-lg p-6 shadow-sm border space-y-4">
           <div class="grid grid-cols-2 gap-4 text-sm">
-            <div><span class="text-gray-600">Confidence:</span> <span class="font-medium ml-1">{{ results.confidence }}</span></div>
-            <div><span class="text-gray-600">Sentiment:</span> <span class="font-medium ml-1">{{ results.sentiment }}</span></div>
+            <div><span class="text-gray-600">Confidence:</span> <span class="font-medium ml-1">{{ results.confidence || 'Medium' }}</span></div>
+            <div><span class="text-gray-600">Sentiment:</span> <span class="font-medium ml-1">{{ results.sentiment || 'N/A' }}</span></div>
             <div><span class="text-gray-600">Words analyzed:</span> <span class="font-medium ml-1">{{ results.text_length || wordCount }}</span></div>
             <div><span class="text-gray-600">Model version:</span> <span class="font-medium ml-1">AWS-enhanced-v1</span></div>
           </div>
@@ -87,7 +109,7 @@
           <div v-if="results.key_phrases?.length">
             <h4 class="font-semibold text-[#252F3E] mt-2 mb-1">Key Phrases:</h4>
             <div class="flex flex-wrap gap-2">
-              <span v-for="phrase in results.key_phrases" :key="phrase"
+              <span v-for="phrase in results.key_phrases.slice(0, 8)" :key="phrase"
                     class="px-2 py-1 bg-gray-100 rounded text-sm text-gray-700">
                 {{ phrase }}
               </span>
@@ -96,8 +118,8 @@
 
           <!-- Explanation -->
           <div v-if="results.explanation" class="mt-4">
-            <h4 class="font-semibold text-[#252F3E] mb-1">Explanation:</h4>
-            <p class="text-sm text-gray-700 whitespace-pre-line">{{ results.explanation }}</p>
+            <h4 class="font-semibold text-[#252F3E] mb-1">Analysis Details:</h4>
+            <p class="text-sm text-gray-700 whitespace-pre-line">{{ formatExplanation(results.explanation) }}</p>
           </div>
         </div>
       </div>
@@ -105,92 +127,17 @@
   </div>
 </template>
 
-
-<!-- <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-
-const inputText = ref('')
-const isAnalyzing = ref(false)
-const results = ref(null)
-
-const wordCount = computed(() => {
-  return inputText.value.trim().split(/\s+/).filter(w => w.length > 0).length
-})
-const hasResults = computed(() => results.value !== null)
-
-const resultColor = computed(() => {
-  if (!results.value) return 'text-gray-500'
-  if (results.value.aiProbability < 30) return 'text-green-600'
-  if (results.value.aiProbability < 70) return 'text-yellow-600'
-  return 'text-red-600'
-})
-
-const progressBarColor = computed(() => {
-  if (!results.value) return 'bg-gray-400'
-  if (results.value.aiProbability < 30) return 'bg-green-500'
-  if (results.value.aiProbability < 70) return 'bg-yellow-500'
-  return 'bg-red-500'
-})
-
-const pasteText = async () => {
-  try {
-    const text = await navigator.clipboard.readText()
-    inputText.value = text
-    resetResults()
-  } catch {
-    inputText.value = 'Paste requires clipboard permissions'
-  }
-}
-
-const resetResults = () => {
-  results.value = null
-}
-
-const analyzeText = async () => {
-  if (!inputText.value.trim()) return
-  isAnalyzing.value = true
-
-  await new Promise(resolve => setTimeout(resolve, 2000))
-
-  const text = inputText.value.toLowerCase()
-  const aiIndicators = ['furthermore', 'moreover', 'additionally']
-  const humanIndicators = ['i think', 'in my opinion', 'personally']
-
-  let aiScore = Math.random() * 100
-  aiScore += aiIndicators.filter(w => text.includes(w)).length * 15
-  aiScore -= humanIndicators.filter(w => text.includes(w)).length * 20
-  aiScore = Math.max(0, Math.min(100, aiScore))
-
-  let classification, reasons
-  if (aiScore < 30) {
-    classification = 'Likely Human-Written'
-    reasons = ['Natural patterns', 'Personal expressions found']
-  } else if (aiScore < 70) {
-    classification = 'Uncertain Origin'
-    reasons = ['Mixed indicators', 'Some formal patterns detected']
-  } else {
-    classification = 'Likely AI-Generated'
-    reasons = ['Formal transitional phrases', 'Consistent style patterns']
-  }
-
-  results.value = {
-    aiProbability: aiScore,
-    classification,
-    confidence: Math.round(85 + Math.random() * 10),
-    processingTime: Math.round(1500 + Math.random() * 1000),
-    modelVersion: 'v2.1.0',
-    reasons
-  }
-
-  isAnalyzing.value = false
-}
-</script> --><script setup>
+<script setup>
 import { ref, computed } from 'vue'
 
 const inputText = ref('')
 const isAnalyzing = ref(false)
 const results = ref(null)
+const error = ref(null)
+
+// You should replace this with your actual API Gateway URL after deployment
+// You can get this from the CloudFormation outputs
+const API_URL = 'https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/Prod/analyze'
 
 const wordCount = computed(() =>
   inputText.value.trim().split(/\s+/).filter(w => w.length > 0).length
@@ -204,6 +151,7 @@ const classification = computed(() => {
   if (s < 70) return 'Uncertain Origin'
   return 'Likely AI-Generated'
 })
+
 const resultColor = computed(() => {
   if (!results.value) return 'text-gray-500'
   const s = results.value.ai_score
@@ -211,6 +159,7 @@ const resultColor = computed(() => {
   if (s < 70) return 'text-yellow-600'
   return 'text-red-600'
 })
+
 const progressBarColor = computed(() => {
   if (!results.value) return 'bg-gray-400'
   const s = results.value.ai_score
@@ -219,42 +168,82 @@ const progressBarColor = computed(() => {
   return 'bg-red-500'
 })
 
-const resetResults = () => (results.value = null)
+const resetResults = () => {
+  results.value = null
+  error.value = null
+}
+
 const pasteText = async () => {
   try {
     inputText.value = await navigator.clipboard.readText()
     resetResults()
-  } catch {
-    inputText.value = 'Clipboard permission required'
+  } catch (err) {
+    console.error('Clipboard access failed:', err)
+    // Fallback message
+    alert('Please paste the text manually (Ctrl+V or Cmd+V)')
   }
 }
 
-const API_URL = 'https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/prod/analyze'
+const formatExplanation = (explanation) => {
+  if (!explanation) return ''
+  // Clean up the explanation formatting
+  return explanation
+    .replace(/\|/g, '\n•')
+    .replace(/Ensemble:/g, '\nEnsemble Analysis:')
+    .replace(/Linguistic features:/g, '\nLinguistic Features:')
+    .trim()
+}
 
 const analyzeText = async () => {
-  if (!inputText.value.trim()) return
+  if (!inputText.value.trim() || inputText.value.trim().split(/\s+/).length < 5) return
+  
   isAnalyzing.value = true
   resetResults()
+  
   try {
-    const res = await fetch(API_URL, {
+    console.log('Sending request to:', API_URL)
+    
+    const response = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: inputText.value })
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ text: inputText.value.trim() })
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    results.value = await res.json()
-  } catch (err) {
-    console.error(err)
-    results.value = {
-      ai_score: 0,
-      sentiment: 'N/A',
-      confidence: 'low',
-      explanation: 'Failed to contact AI detection service.',
-      key_phrases: [],
-      text_length: wordCount.value
+    
+    console.log('Response status:', response.status)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('API Error:', errorText)
+      throw new Error(`API returned ${response.status}: ${errorText}`)
     }
+    
+    const data = await response.json()
+    console.log('API Response:', data)
+    
+    // Handle both direct responses and wrapped responses
+    if (data.body && typeof data.body === 'string') {
+      results.value = JSON.parse(data.body)
+    } else if (data.ai_score !== undefined) {
+      results.value = data
+    } else {
+      throw new Error('Unexpected response format')
+    }
+    
+  } catch (err) {
+    console.error('Analysis error:', err)
+    error.value = err.message.includes('fetch') 
+      ? 'Unable to connect to analysis service. Please check your internet connection and try again.'
+      : err.message
   } finally {
     isAnalyzing.value = false
   }
+}
+
+const retryAnalysis = () => {
+  error.value = null
+  analyzeText()
 }
 </script>
