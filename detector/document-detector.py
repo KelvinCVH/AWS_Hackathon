@@ -6,8 +6,17 @@ import os
 import re
 import statistics
 import logging
+import io
 from collections import Counter
 from urllib.parse import unquote_plus
+
+# PDF and DOCX processing libraries
+from pdfminer.high_level import extract_text as pdf_extract_text
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+from docx import Document
 
 # Configure logging for CloudWatch
 logger = logging.getLogger()
@@ -21,60 +30,119 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME", "ai-detection-documents")
 
 def get_clients():
     """Initialize AWS clients with forced region config."""
-    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "ap-southeast-5"))
-    textract = boto3.client("textract", region_name=BEDROCK_REGION)
-    dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-southeast-5"))
-    comprehend = boto3.client("comprehend", region_name=BEDROCK_REGION)
-    bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+    # Use DATA_REGION for data services (S3, DynamoDB)
+    data_region = os.environ.get("DATA_REGION", "ap-southeast-1")
+    
+    # Use BEDROCK_REGION for AI/ML services (Comprehend, Bedrock)
+    ai_region = os.environ.get("BEDROCK_REGION", "us-east-1")
+    
+    s3 = boto3.client("s3", region_name=data_region)
+    dynamodb = boto3.resource("dynamodb", region_name=data_region)
+    comprehend = boto3.client("comprehend", region_name=ai_region)
+    bedrock = boto3.client("bedrock-runtime", region_name=ai_region)
 
     # Debug log: confirm regions
     logger.info(f"S3 region: {s3.meta.region_name}")
-    logger.info(f"Textract region: {textract.meta.region_name}")
     logger.info(f"DynamoDB region: {dynamodb.meta.client.meta.region_name}")
     logger.info(f"Comprehend region: {comprehend.meta.region_name}")
     logger.info(f"Bedrock region: {bedrock.meta.region_name}")
 
-    return s3, textract, dynamodb, comprehend, bedrock
+    return s3, dynamodb, comprehend, bedrock
 
 
-def extract_text_from_document(s3, textract, bucket_name, object_key):
-    """Extract text from document using AWS Textract."""
+def extract_text_from_pdf(file_stream):
+    """Extract text from PDF using pdfminer.six."""
+    try:
+        # Method 1: Use high-level extract_text function
+        text = pdf_extract_text(file_stream)
+        
+        if text and len(text.strip()) > 0:
+            return text.strip()
+        
+        # Method 2: Fallback to lower-level extraction if high-level fails
+        file_stream.seek(0)  # Reset stream position
+        
+        resource_manager = PDFResourceManager()
+        fake_file_handle = io.StringIO()
+        converter = TextConverter(resource_manager, fake_file_handle, laparams=LAParams())
+        page_interpreter = PDFPageInterpreter(resource_manager, converter)
+        
+        for page in PDFPage.get_pages(file_stream, caching=True, check_extractable=True):
+            page_interpreter.process_page(page)
+        
+        text = fake_file_handle.getvalue()
+        converter.close()
+        fake_file_handle.close()
+        
+        return text.strip()
+        
+    except Exception as e:
+        logger.error(f"Error extracting text from PDF: {str(e)}")
+        raise
+
+
+def extract_text_from_docx(file_stream):
+    """Extract text from DOCX using python-docx."""
+    try:
+        # Load the document from the stream
+        doc = Document(file_stream)
+        
+        # Extract text from all paragraphs
+        full_text = []
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():  # Only add non-empty paragraphs
+                full_text.append(paragraph.text)
+        
+        # Also extract text from tables if any
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        full_text.append(cell.text)
+        
+        extracted_text = '\n'.join(full_text)
+        return extracted_text.strip()
+        
+    except Exception as e:
+        logger.error(f"Error extracting text from DOCX: {str(e)}")
+        raise
+
+
+def extract_text_from_document(s3, bucket_name, object_key):
+    """Extract text from document using local libraries instead of Textract."""
     try:
         logger.info(f"Starting text extraction for {bucket_name}/{object_key}")
         
         # Get file extension to determine processing method
         file_extension = object_key.lower().split('.')[-1]
         
-        if file_extension in ['jpg', 'jpeg', 'png', 'pdf']:
-            # Use Textract for images and PDFs
-            response = textract.detect_document_text(
-                Document={
-                    'S3Object': {
-                        'Bucket': bucket_name,
-                        'Name': object_key
-                    }
-                }
-            )
+        # Only support PDF and DOCX files
+        if file_extension not in ['pdf', 'docx']:
+            raise ValueError(f"Unsupported file type: {file_extension}. Only PDF and DOCX files are supported.")
+        
+        # Download file from S3 into memory
+        obj = s3.get_object(Bucket=bucket_name, Key=object_key)
+        file_content = obj['Body'].read()
+        file_stream = io.BytesIO(file_content)
+        
+        extracted_text = ""
+        extraction_method = ""
+        
+        if file_extension == 'pdf':
+            extracted_text = extract_text_from_pdf(file_stream)
+            extraction_method = "pdfminer"
+            logger.info(f"Extracted {len(extracted_text)} characters from PDF using pdfminer")
             
-            # Extract text from Textract response
-            extracted_text = ""
-            for item in response.get('Blocks', []):
-                if item['BlockType'] == 'LINE':
-                    extracted_text += item['Text'] + "\n"
-            
-            logger.info(f"Extracted {len(extracted_text)} characters from document")
-            return extracted_text.strip(), "textract"
-            
-        elif file_extension in ['txt', 'csv']:
-            # For plain text files, read directly from S3
-            obj = s3.get_object(Bucket=bucket_name, Key=object_key)
-            extracted_text = obj['Body'].read().decode('utf-8')
-            logger.info(f"Read {len(extracted_text)} characters from text file")
-            return extracted_text, "direct_read"
-            
-        else:
-            raise ValueError(f"Unsupported file type: {file_extension}")
-            
+        elif file_extension == 'docx':
+            extracted_text = extract_text_from_docx(file_stream)
+            extraction_method = "python-docx"
+            logger.info(f"Extracted {len(extracted_text)} characters from DOCX using python-docx")
+        
+        if not extracted_text or len(extracted_text.strip()) < 10:
+            raise ValueError(f"No readable text found in {file_extension.upper()} file or text too short")
+        
+        return extracted_text.strip(), extraction_method
+        
     except Exception as e:
         logger.error(f"Error extracting text from document: {str(e)}")
         raise
@@ -351,7 +419,7 @@ def analyze_with_multiple_prompts(text, bedrock):
 
 
 def analyze_text(text, comprehend, bedrock):
-    """Enhanced analysis combining multiple detection methods - reused from text-detector.py."""
+    """Enhanced analysis combining multiple detection methods."""
     
     # --- Comprehend analysis ---
     try:
@@ -439,12 +507,12 @@ def lambda_handler(event, context):
                     "body": json.dumps({"error": "No object_key provided"})
                 }
         
-        # Initialize AWS clients
-        s3, textract, dynamodb, comprehend, bedrock = get_clients()
+        # Initialize AWS clients (no textract needed)
+        s3, dynamodb, comprehend, bedrock = get_clients()
         table = dynamodb.Table(TABLE_NAME)
         
-        # Extract text from document
-        extracted_text, extraction_method = extract_text_from_document(s3, textract, bucket_name, object_key)
+        # Extract text from document using local libraries
+        extracted_text, extraction_method = extract_text_from_document(s3, bucket_name, object_key)
         
         if len(extracted_text) < 10:
             return {
@@ -452,7 +520,7 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": "Extracted text too short for meaningful analysis"})
             }
         
-        # Analyze the extracted text using the same logic as text-detector.py
+        # Analyze the extracted text
         sentiment, key_phrases, ai_score, explanation = analyze_text(extracted_text, comprehend, bedrock)
         
         # Get document metadata
@@ -465,7 +533,7 @@ def lambda_handler(event, context):
             file_size = 0
             last_modified = ""
         
-        # Build enhanced item for DynamoDB (matching your existing table structure)
+        # Build enhanced item for DynamoDB
         item = {
             "id": str(uuid.uuid4()),
             "timestamp": str(int(time.time())),
@@ -474,13 +542,13 @@ def lambda_handler(event, context):
             "file_size": file_size,
             "last_modified": last_modified,
             "extraction_method": extraction_method,
-            "input_text": extracted_text[:1000],  # Store first 1000 chars (same as text-detector)
+            "input_text": extracted_text[:1000],  # Store first 1000 chars
             "text_length": len(extracted_text),
             "ai_score": ai_score,
             "explanation": explanation[:500],  # Truncate long explanations
             "sentiment": sentiment,
             "key_phrases": key_phrases[:10],  # Limit key phrases
-            "analysis_version": "document_v1",
+            "analysis_version": "document_v2",
             "source_type": "document"  # To distinguish from text analysis
         }
         
@@ -491,7 +559,7 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error(f"Failed to write to DynamoDB: {str(e)}")
         
-        # Return response (matching text-detector format)
+        # Return response
         response_body = {
             "document_id": item["id"],
             "object_key": object_key,
