@@ -11,6 +11,7 @@ Globals:
       AllowMethods: '''GET,POST,OPTIONS'''
       AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
       AllowOrigin: '''*'''
+      MaxAge: '''600'''
 Resources:
   AnalyzeFunction:
     Type: AWS::Serverless::Function
@@ -44,6 +45,11 @@ Resources:
           Properties:
             Path: /analyze
             Method: post
+        ApiOptions:
+          Type: Api
+          Properties:
+            Path: /analyze
+            Method: options
       Environment:
         Variables:
           TABLE_NAME:
@@ -85,19 +91,34 @@ Resources:
           - s3:GetObject
           - s3:GetObjectVersion
           - s3:HeadObject
+          - s3:PutObject
+          - s3:PutObjectAcl
           Resource:
           - arn:aws:s3:::ai-detection-documents/*
+      - Statement:
+          Effect: Allow
+          Action:
+          - s3:ListBucket
+          Resource:
+          - arn:aws:s3:::ai-detection-documents
       Events:
         Api:
           Type: Api
           Properties:
             Path: /process-document
             Method: post
+        ApiOptions:
+          Type: Api
+          Properties:
+            Path: /process-document
+            Method: options
       Environment:
         Variables:
           TABLE_NAME:
             Ref: ContentDetectionsTable
           BEDROCK_REGION: us-east-1
+          DATA_REGION:
+            Ref: AWS::Region
           BUCKET_NAME: ai-detection-documents
     Metadata:
       SamResourceId: DocumentDetectorFunction
@@ -125,6 +146,9 @@ Outputs:
     Description: API Gateway endpoint URL for Document Detector function
     Value:
       Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/process-document
+  DocumentsBucketName:
+    Description: S3 bucket name for document storage
+    Value: ai-detection-documents
   DynamoDBTableName:
     Description: DynamoDB table name for storing analysis results
     Value:
