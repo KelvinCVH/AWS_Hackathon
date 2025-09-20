@@ -9,11 +9,12 @@ Globals:
     MemorySize: 512
 
 Resources:
+  # Text Analyzer Function
   AnalyzeFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: detector.app.lambda_handler
+      Handler: detector.text-detector.lambda_handler
       Runtime: python3.11
       Policies:
         - AmazonDynamoDBFullAccess   # Hackathon shortcut
@@ -34,7 +35,54 @@ Resources:
         Variables:
           TABLE_NAME: !Ref ContentDetectionsTable
           BEDROCK_REGION: "us-east-1"
+          DATA_REGION: "ap-southeast-1"
 
+  # Document Detector Function  
+  DocumentDetectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: detector.document-detector.lambda_handler
+      Runtime: python3.11
+      Timeout: 300  # 5 minutes for document processing
+      MemorySize: 1024  # Higher memory for document processing
+      Policies:
+        - AmazonDynamoDBFullAccess   # Hackathon shortcut
+        - CloudWatchLogsFullAccess
+        - ComprehendReadOnly
+        - Statement:
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource: "*"
+        - Statement:
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:HeadObject
+            Resource: 
+              - "arn:aws:s3:::ai-detection-documents/*"
+        - Statement:
+            Effect: Allow
+            Action:
+              - textract:DetectDocumentText
+              - textract:AnalyzeDocument
+            Resource: "*"
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /process-document
+            Method: post
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ContentDetectionsTable
+          BEDROCK_REGION: "us-east-1"
+          DATA_REGION: "ap-southeast-1" 
+          BUCKET_NAME: "ai-detection-documents"
+
+  # DynamoDB Table
   ContentDetectionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -52,6 +100,26 @@ Resources:
       BillingMode: PAY_PER_REQUEST
 
 Outputs:
+  # Text Analyzer API
   ApiUrl:
-    Description: "API Gateway endpoint URL for Analyze function"
+    Description: "API Gateway endpoint URL for Text Analyze function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze"
+
+  # Document Detector API  
+  DocumentDetectorApiUrl:
+    Description: "API Gateway endpoint URL for Document Detector function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/process-document"
+
+  # DynamoDB Table Name
+  DynamoDBTableName:
+    Description: "DynamoDB table name for storing analysis results"
+    Value: !Ref ContentDetectionsTable
+
+  # Lambda Function Names
+  TextDetectorFunctionName:
+    Description: "Lambda function name for text detection"
+    Value: !Ref AnalyzeFunction
+    
+  DocumentDetectorFunctionName:
+    Description: "Lambda function name for document detection"  
+    Value: !Ref DocumentDetectorFunction
