@@ -348,107 +348,81 @@
               </div>
 
               <!-- Advanced Analysis Tab -->
-              <div v-show="activeTab === 'advanced'" class="space-y-4">
-                <h4 class="font-semibold text-gray-800 mb-3">Advanced Analysis</h4>
+              <div v-show="activeTab === 'advanced'" class="space-y-6">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-semibold text-gray-800">Key Analysis Factors</h4>
+                  <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {{ results.simplifiedAnalysis ? 'Simplified for All Users' : 'Enhanced Analysis View' }}
+                  </span>
+                </div>
                 
-                <!-- Comprehend Analysis -->
-                <div v-if="results.comprehendAnalysis && Object.keys(results.comprehendAnalysis).length > 0" class="space-y-4">
-                  <h5 class="text-sm font-medium text-gray-700 mb-3">AWS Comprehend Analysis</h5>
-                  
-                  <!-- Sentiment Scores -->
-                  <div v-if="results.comprehendAnalysis.sentiment_scores" class="bg-blue-50 rounded-lg p-4">
-                    <h6 class="text-sm font-medium text-blue-800 mb-2">Sentiment Breakdown</h6>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div v-for="(score, sentiment) in results.comprehendAnalysis.sentiment_scores" 
-                           :key="sentiment"
-                           class="flex items-center justify-between">
-                        <span class="text-sm text-blue-700 capitalize">{{ sentiment }}:</span>
-                        <span class="text-sm font-bold text-blue-800">{{ Math.round(score * 100) }}%</span>
+                <!-- Simplified Analysis Display -->
+                <div v-if="(results.simplifiedAnalysis && Object.keys(results.simplifiedAnalysis).length > 0) || hasLegacyAnalysis()" class="space-y-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-for="(analysis, key) in (results.simplifiedAnalysis || convertLegacyToSimplified())" 
+                         :key="key"
+                         class="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div class="flex items-center justify-between mb-3">
+                        <h6 class="font-medium text-gray-800">{{ getAnalysisTitle(key) }}</h6>
+                        <span class="text-sm font-bold px-2 py-1 rounded-full" 
+                              :class="getAnalysisIndicatorClass(analysis.indicator)">
+                          {{ analysis.indicator }}
+                        </span>
                       </div>
+                      
+                      <div class="mb-3">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm text-gray-600">Score</span>
+                          <span class="text-sm font-semibold" :class="getScoreColor(analysis.score)">
+                            {{ analysis.score }}%
+                          </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            class="h-2 rounded-full transition-all duration-1000 ease-out"
+                            :class="getScoreBarColor(analysis.score)"
+                            :style="{ width: Math.min(analysis.score, 100) + '%' }"
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      <p class="text-xs text-gray-500 leading-relaxed">
+                        {{ analysis.description }}
+                      </p>
                     </div>
                   </div>
-
-                  <!-- Entities -->
-                  <div v-if="results.comprehendAnalysis.entities && results.comprehendAnalysis.entities.length > 0" class="bg-green-50 rounded-lg p-4">
-                    <h6 class="text-sm font-medium text-green-800 mb-2">Named Entities</h6>
-                    <div class="flex flex-wrap gap-2">
-                      <span v-for="entity in results.comprehendAnalysis.entities.slice(0, 8)" 
-                            :key="entity.Text"
-                            class="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                        {{ entity.Text }} ({{ entity.Type }})
-                      </span>
-                    </div>
-                    <p v-if="results.comprehendAnalysis.entities.length > 8" class="text-xs text-green-600 mt-2">
-                      And {{ results.comprehendAnalysis.entities.length - 8 }} more entities
+                  
+                  <!-- Analysis Summary -->
+                  <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border-l-4 border-blue-400">
+                    <h6 class="font-medium text-gray-800 mb-2">📊 Analysis Summary</h6>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                      This analysis examines four key factors that help distinguish between human and AI-generated content. 
+                      Each factor is scored based on specific patterns and characteristics found in the document.
                     </p>
                   </div>
-
-                  <!-- Language and Syntax -->
-                  <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-gray-50 rounded-lg p-3">
-                      <p class="text-xs text-gray-600 mb-1">Dominant Language</p>
-                      <p class="font-semibold text-sm">{{ results.comprehendAnalysis.dominant_language || 'Unknown' }}</p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                      <p class="text-xs text-gray-600 mb-1">Syntax Complexity</p>
-                      <p class="font-semibold text-sm">{{ results.comprehendAnalysis.syntax_complexity || 0 }} tokens</p>
-                    </div>
+                </div>
+                
+                <!-- Fallback for older analysis format -->
+                <div v-else-if="results.comprehendAnalysis || results.linguisticFeatures" class="space-y-4">
+                  <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p class="text-sm text-yellow-800">
+                      <strong>Note:</strong> This document was analyzed with an older version. 
+                      Please re-analyze to see the simplified analysis format.
+                    </p>
+                    <button @click="analyzeDocument" 
+                            class="mt-3 px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors">
+                      Re-analyze Document
+                    </button>
                   </div>
                 </div>
-
-                <!-- Linguistic Features -->
-                <div v-if="results.linguisticFeatures && Object.keys(results.linguisticFeatures).length > 0" class="space-y-4">
-                  <h5 class="text-sm font-medium text-gray-700 mb-3">Linguistic Features Analysis</h5>
-                  
-                  <div class="grid grid-cols-2 gap-4">
-                    <div v-for="(value, feature) in results.linguisticFeatures" 
-                         :key="feature"
-                         class="bg-gray-50 rounded-lg p-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">{{ getFeatureLabel(feature) }}</span>
-                        <span class="text-lg font-bold" :class="getMetricColor(value)">
-                          {{ value }}%
-                        </span>
-                      </div>
-                      <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          class="h-2 rounded-full transition-all duration-1000 ease-out"
-                          :class="getMetricBarColor(value)"
-                          :style="{ width: value + '%' }"
-                        ></div>
-                      </div>
-                      <p class="text-xs text-gray-500 mt-1">{{ getFeatureDescription(feature, value) }}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Detection Breakdown -->
-                <div v-if="results.detectionBreakdown && Object.keys(results.detectionBreakdown).length > 0" class="space-y-4">
-                  <h5 class="text-sm font-medium text-gray-700 mb-3">Detection Breakdown</h5>
-                  
-                  <div class="bg-purple-50 rounded-lg p-4">
-                    <h6 class="text-sm font-medium text-purple-800 mb-3">Analysis Components</h6>
-                    <div class="grid grid-cols-1 gap-3">
-                      <div class="flex items-center justify-between">
-                        <span class="text-sm text-purple-700">Linguistic Analysis:</span>
-                        <span class="text-sm font-bold text-purple-800">
-                          {{ results.detectionBreakdown.linguistic_score || 0 }}%
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between">
-                        <span class="text-sm text-purple-700">Ensemble Score:</span>
-                        <span class="text-sm font-bold text-purple-800">
-                          {{ results.detectionBreakdown.ensemble_score || 0 }}%
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between">
-                        <span class="text-sm text-purple-700">Confidence Level:</span>
-                        <span class="text-sm font-bold text-purple-800 capitalize">
-                          {{ results.detectionBreakdown.confidence_level || 'Medium' }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                
+                <!-- No analysis data -->
+                <div v-else class="text-center py-8 text-gray-500">
+                  <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p class="text-sm">No advanced analysis data available</p>
                 </div>
               </div>
 
@@ -826,6 +800,87 @@ const getFeatureDescription = (feature, value) => {
     'temporal': value < 30 ? 'Many temporal references, human-like' : value > 70 ? 'Few temporal references, AI-like' : 'Moderate references'
   }
   return descriptions[feature] || 'Analysis metric'
+}
+
+// New helper functions for simplified analysis
+const getAnalysisTitle = (key) => {
+  const titles = {
+    'writing_style': 'Writing Style',
+    'personal_touch': 'Personal Touch',
+    'content_specificity': 'Content Specificity',
+    'language_complexity': 'Language Complexity'
+  }
+  return titles[key] || key
+}
+
+const getAnalysisIndicatorClass = (indicator) => {
+  const classes = {
+    'Natural': 'bg-green-100 text-green-800',
+    'Formal': 'bg-blue-100 text-blue-800',
+    'Personal': 'bg-green-100 text-green-800',
+    'Generic': 'bg-gray-100 text-gray-800',
+    'Specific': 'bg-blue-100 text-blue-800',
+    'Vague': 'bg-yellow-100 text-yellow-800',
+    'Varied': 'bg-purple-100 text-purple-800',
+    'Uniform': 'bg-orange-100 text-orange-800'
+  }
+  return classes[indicator] || 'bg-gray-100 text-gray-800'
+}
+
+const getScoreColor = (score) => {
+  if (score < 30) return 'text-red-600'
+  if (score < 60) return 'text-yellow-600'
+  return 'text-green-600'
+}
+
+const getScoreBarColor = (score) => {
+  if (score < 30) return 'bg-red-500'
+  if (score < 60) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// Legacy analysis compatibility
+const hasLegacyAnalysis = () => {
+  return results.value && (results.value.comprehendAnalysis || results.value.linguisticFeatures)
+}
+
+const convertLegacyToSimplified = () => {
+  if (!results.value) return {}
+  
+  const legacy = results.value
+  const simplified = {}
+  
+  // Convert linguistic features if available
+  if (legacy.linguisticFeatures) {
+    simplified.writing_style = {
+      score: legacy.linguisticFeatures.perplexity || 50,
+      description: "How natural and varied the writing appears",
+      indicator: (legacy.linguisticFeatures.perplexity || 50) < 40 ? "Natural" : "Formal"
+    }
+    
+    simplified.personal_touch = {
+      score: legacy.linguisticFeatures.human_score || 50,
+      description: "Evidence of personal experience and emotion",
+      indicator: (legacy.linguisticFeatures.human_score || 50) > 60 ? "Personal" : "Generic"
+    }
+    
+    simplified.language_complexity = {
+      score: legacy.linguisticFeatures.complexity_variation || 50,
+      description: "Variation in sentence structure and vocabulary",
+      indicator: (legacy.linguisticFeatures.complexity_variation || 50) > 60 ? "Varied" : "Uniform"
+    }
+  }
+  
+  // Convert comprehend analysis if available
+  if (legacy.comprehendAnalysis) {
+    simplified.content_specificity = {
+      score: (legacy.comprehendAnalysis.entities?.length || 0) * 10,
+      description: "Use of specific details and concrete information",
+      indicator: (legacy.comprehendAnalysis.entities?.length || 0) > 3 ? "Specific" : "Vague"
+    }
+  }
+  
+  return simplified
 }
 
 const handleDrop = (e) => {

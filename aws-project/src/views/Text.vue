@@ -225,7 +225,7 @@
                   </div>
                   <div class="bg-gray-50 rounded-lg p-3">
                     <p class="text-xs text-gray-600 mb-1">Entities Found</p>
-                    <p class="font-semibold">{{ results.details.semantic_analysis.entities_found || 0 }}</p>
+                    <p class="font-semibold">{{ results.details.semantic_analysis.entities_found || results.details.semantic_analysis.entities?.length || 0 }}</p>
                   </div>
                 </div>
                 
@@ -284,26 +284,59 @@
 
             <!-- Explanation Tab -->
             <div v-show="activeTab === 'explanation'" class="space-y-4">
-              <h4 class="font-semibold text-gray-800 mb-3">Full Analysis Summary</h4>
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="font-semibold text-gray-800">Comprehensive Analysis Summary</h4>
+                <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  Enhanced Detection v2
+                </span>
+              </div>
               
-              <div v-if="results.explanation" class="space-y-3">
+              <div v-if="results.explanation" class="space-y-4">
                 <div v-for="(part, index) in parseExplanation(results.explanation)" 
                      :key="index"
                      :class="getExplanationPartClass(part)">
                   <div class="flex items-start">
-                    <span class="mr-2 mt-0.5">{{ getExplanationIcon(part) }}</span>
-                    <p class="text-sm leading-relaxed flex-1">
-                      {{ cleanExplanationPart(part) }}
-                    </p>
+                    <span class="mr-3 mt-1 text-lg">{{ getExplanationIcon(part) }}</span>
+                    <div class="flex-1">
+                      <p class="text-sm leading-relaxed">
+                        {{ cleanExplanationPart(part) }}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+              <!-- Enhanced Analysis Details -->
+              <div v-if="results.details" class="mt-6 space-y-4">
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border">
+                  <h5 class="font-medium text-gray-800 mb-2">🔍 Analysis Breakdown</h5>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div v-if="results.details.linguistic_analysis">
+                      <span class="font-medium text-gray-600">Linguistic Score:</span>
+                      <span class="ml-2 font-semibold">{{ results.details.linguistic_analysis.score }}%</span>
+                    </div>
+                    <div v-if="results.details.model_analysis">
+                      <span class="font-medium text-gray-600">Model Score:</span>
+                      <span class="ml-2 font-semibold">{{ results.details.model_analysis.score }}%</span>
+                    </div>
+                    <div v-if="results.details.semantic_analysis">
+                      <span class="font-medium text-gray-600">Entities Found:</span>
+                      <span class="ml-2 font-semibold">{{ results.details.semantic_analysis.entities_found || 0 }}</span>
+                    </div>
+                    <div v-if="results.details.semantic_analysis">
+                      <span class="font-medium text-gray-600">Sentiment:</span>
+                      <span class="ml-2 font-semibold capitalize">{{ results.details.semantic_analysis.sentiment || 'N/A' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="mt-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
                 <p class="text-sm text-blue-800">
-                  <strong>Note:</strong> This analysis uses multiple detection methods including linguistic patterns, 
-                  semantic analysis, and AI model assessment. Results are probabilistic and should be considered alongside 
-                  other factors when making determinations about text authorship.
+                  <strong>📊 Enhanced Analysis:</strong> This comprehensive analysis combines advanced linguistic pattern detection, 
+                  semantic analysis, and AI model assessment. The system examines multiple dimensions including writing style, 
+                  emotional expression, specificity of details, and natural language patterns to provide a thorough evaluation 
+                  of text authorship.
                 </p>
               </div>
             </div>
@@ -438,13 +471,16 @@ const formatIndicator = (indicator) => {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
-// New improved formatting functions
+// Enhanced formatting functions for comprehensive explanations
 const parseExplanation = (explanation) => {
   if (!explanation) return []
   
-  // Split by periods followed by capital letters or common separators
+  // Enhanced parsing for comprehensive explanations
   const parts = explanation
-    .split(/\.\s+(?=[A-Z])|(?:\s*\|\s*)|(?:\s*\.\s*$)/)
+    .split(/\s*\|\s*/)  // Split by pipe separators first
+    .flatMap(part => 
+      part.split(/\.\s+(?=[A-Z])/)  // Then split by sentence boundaries
+    )
     .filter(part => part && part.trim().length > 0)
     .map(part => part.trim())
   
@@ -453,33 +489,40 @@ const parseExplanation = (explanation) => {
 
 const getExplanationPartClass = (part) => {
   const partLower = part.toLowerCase()
-  if (partLower.includes('human pattern') || partLower.includes('human trait')) {
-    return 'bg-green-50 p-3 rounded-lg'
+  if (partLower.includes('human pattern') || partLower.includes('human trait') || partLower.includes('human writing')) {
+    return 'bg-green-50 border-l-4 border-green-400 p-4 rounded-lg'
   }
-  if (partLower.includes('ai pattern') || partLower.includes('ai trait')) {
-    return 'bg-red-50 p-3 rounded-lg'
+  if (partLower.includes('ai pattern') || partLower.includes('ai trait') || partLower.includes('ai writing')) {
+    return 'bg-red-50 border-l-4 border-red-400 p-4 rounded-lg'
   }
-  if (partLower.includes('style:')) {
-    return 'bg-blue-50 p-3 rounded-lg'
+  if (partLower.includes('advanced model') || partLower.includes('model analysis')) {
+    return 'bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg'
   }
-  if (partLower.includes('content:')) {
-    return 'bg-purple-50 p-3 rounded-lg'
+  if (partLower.includes('semantic analysis') || partLower.includes('entities') || partLower.includes('sentiment')) {
+    return 'bg-purple-50 border-l-4 border-purple-400 p-4 rounded-lg'
   }
-  return 'bg-gray-50 p-3 rounded-lg'
+  if (partLower.includes('complexity') || partLower.includes('natural')) {
+    return 'bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg'
+  }
+  return 'bg-gray-50 border-l-4 border-gray-400 p-4 rounded-lg'
 }
 
 const getExplanationIcon = (part) => {
   const partLower = part.toLowerCase()
   if (partLower.includes('human')) return '👤'
   if (partLower.includes('ai')) return '🤖'
+  if (partLower.includes('advanced model') || partLower.includes('model analysis')) return '🧠'
+  if (partLower.includes('semantic') || partLower.includes('entities') || partLower.includes('sentiment')) return '🔍'
+  if (partLower.includes('complexity') || partLower.includes('natural')) return '📊'
   if (partLower.includes('style')) return '✏️'
   if (partLower.includes('content')) return '📝'
   return '📊'
 }
 
 const cleanExplanationPart = (part) => {
-  // Remove redundant prefixes and clean up the text
+  // Enhanced cleaning for comprehensive explanations
   return part
+    .replace(/^(Human writing patterns detected:|AI writing patterns detected:|Advanced model analysis:|Semantic analysis:|Natural sentence complexity variation detected:)\s*/i, '')
     .replace(/^(Human patterns:|AI patterns:|Style:|Content:|Model analysis:)\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
