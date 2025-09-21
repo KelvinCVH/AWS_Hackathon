@@ -291,21 +291,6 @@
             </div>
           </div>
 
-          <!-- Quick Stats -->
-          <div class="grid grid-cols-3 gap-4">
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Model Used</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.modelInfo?.name || 'ARTID' }}</p>
-            </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Confidence</p>
-              <p class="text-xl font-bold text-gray-800">{{ Math.round(results.confidence * 100) }}%</p>
-            </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Analysis Version</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.analysisVersion || 'v1.0' }}</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

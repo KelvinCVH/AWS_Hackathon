@@ -69,7 +69,6 @@ const activeOption = ref('home')
 const detectionOptions = [
   { id: 'text', name: 'Text Detection' },
   { id: 'document', name: 'Document' },
-  { id: 'image', name: 'Image' },
-  { id: 'voice', name: 'Voice' }
+  { id: 'image', name: 'Image' }
 ]
 </script>
