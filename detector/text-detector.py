@@ -298,27 +298,55 @@ def analyze_with_nova_pro(text, bedrock):
     prompts = [
         {
             "instruction": (
-                "Analyze if this text is AI-generated or human-written. Focus on:\n"
-                "HUMAN indicators: Personal stories, specific details (dates/prices/names), "
-                "informal language, emotions, opinions, typos, contractions like I'm/don't, "
-                "inconsistent style, unique experiences.\n"
-                "AI indicators: Generic phrases, perfect grammar throughout, formal transitions "
-                "(furthermore/moreover), vague superlatives without specifics, consistent structure.\n"
-                "IMPORTANT: Default to human unless clear AI patterns. Many humans write well too.\n"
+                "Provide a comprehensive analysis of whether this text is AI-generated or human-written. "
+                "Examine multiple dimensions:\n\n"
+                "HUMAN WRITING INDICATORS:\n"
+                "• Personal experiences: First-person narratives, specific details (dates, prices, names, locations)\n"
+                "• Emotional expression: Subjective opinions, feelings, frustrations, excitement\n"
+                "• Informal language: Contractions (I'm, don't, won't), casual expressions, slang\n"
+                "• Natural imperfections: Minor typos, inconsistent formatting, conversational flow\n"
+                "• Unique voice: Personal anecdotes, individual perspectives, authentic reactions\n\n"
+                "AI WRITING INDICATORS:\n"
+                "• Formulaic language: Overused phrases like 'it is worth noting', 'furthermore', 'moreover'\n"
+                "• Perfect structure: Consistent sentence lengths, perfect grammar throughout\n"
+                "• Generic superlatives: 'exceptional', 'outstanding', 'revolutionary' without specific details\n"
+                "• Corporate tone: Overly formal, lacks personal touch, sounds like marketing copy\n"
+                "• Repetitive patterns: Similar sentence structures, repeated transition words\n\n"
+                "ANALYSIS REQUIREMENTS:\n"
+                "• Provide detailed reasoning for your assessment\n"
+                "• Cite specific examples from the text\n"
+                "• Consider the context and purpose of the writing\n"
+                "• Be thorough but concise in your explanation\n"
+                "• Default to human authorship unless clear AI patterns are evident\n\n"
                 "Score 0-100 (0=definitely human, 100=definitely AI).\n"
-                'Respond ONLY with: {"ai_score": [number], "explanation": "[brief reason under 50 words]"}'
+                'Respond with: {"ai_score": [number], "explanation": "[comprehensive analysis 100-200 words]"}'
             ),
             "weight": 0.5
         },
         {
             "instruction": (
-                "Is this written by a real person or AI? Check for:\n"
-                "Real person signs: Mentions specific people/places/times, uses 'I/we/my', "
-                "shows emotion or frustration, has opinions, casual tone.\n"
-                "AI signs: Sounds like a template, too perfect, no personal touch, "
-                "overuses words like 'comprehensive/innovative/seamless'.\n"
-                "Be skeptical of calling it AI - humans can write formally too.\n"
-                'Score 0-100 where lower=more human. Format: {"ai_score": [number], "explanation": "[reason under 50 words]"}'
+                "Conduct a detailed linguistic and stylistic analysis to determine if this text is human or AI-generated. "
+                "Evaluate the following aspects comprehensively:\n\n"
+                "AUTHENTICITY INDICATORS:\n"
+                "• Personal voice: Unique expressions, individual writing style, authentic personality\n"
+                "• Specificity: Concrete details, real experiences, particular circumstances\n"
+                "• Emotional authenticity: Genuine feelings, personal reactions, subjective perspectives\n"
+                "• Natural language patterns: How humans actually speak and write\n"
+                "• Contextual awareness: Understanding of real-world situations and nuances\n\n"
+                "ARTIFICIALITY INDICATORS:\n"
+                "• Generic language: Vague, non-specific descriptions, template-like phrases\n"
+                "• Overly polished: Too perfect grammar, no natural variation, robotic consistency\n"
+                "• Marketing speak: Corporate buzzwords, promotional language, sales-oriented tone\n"
+                "• Lack of personality: No individual voice, generic responses, impersonal style\n"
+                "• Structural patterns: Repetitive sentence construction, formulaic organization\n\n"
+                "ANALYSIS APPROACH:\n"
+                "• Examine word choice, sentence structure, and overall tone\n"
+                "• Look for evidence of genuine human experience vs. generated content\n"
+                "• Consider the writing context and intended audience\n"
+                "• Provide specific examples from the text to support your assessment\n"
+                "• Be thorough in explaining your reasoning\n\n"
+                "Score 0-100 (0=definitely human, 100=definitely AI).\n"
+                'Format: {"ai_score": [number], "explanation": "[detailed analysis 150-250 words]"}'
             ),
             "weight": 0.5
         }
@@ -341,10 +369,10 @@ def analyze_with_nova_pro(text, bedrock):
                     }
                 ],
                 "inferenceConfig": {
-                    "maxTokens": 300,  # Increased from 100 to 300 for complete responses
-                    "temperature": 0.1,  # Low but not zero for some variation
-                    "topP": 0.9,  # Add topP for better control
-                    "stopSequences": ["\n\n", "}", '"}']  # Stop after JSON closes
+                    "maxTokens": 1500,  # Increased to 1500 for comprehensive explanations
+                    "temperature": 0.2,  # Slightly higher for more detailed responses
+                    "topP": 0.95,  # Higher topP for more comprehensive coverage
+                    "stopSequences": ["\n\n\n", "}", '"}']  # Allow more detailed responses
                 }
             }
             
@@ -384,22 +412,25 @@ def analyze_with_nova_pro(text, bedrock):
                 if cleaned.count('{') > cleaned.count('}'):
                     cleaned += '}'
                 
-                # Truncate explanation if it's cut off
+                # Handle incomplete JSON more robustly
                 if '"explanation": "' in cleaned and not cleaned.rstrip().endswith('"}'):
                     # Find where explanation starts and close it properly
                     exp_start = cleaned.find('"explanation": "') + len('"explanation": "')
                     exp_end = cleaned.find('"', exp_start)
                     if exp_end == -1:
-                        # Explanation was cut off, close it
-                        cleaned = cleaned.rstrip() + '"}'
+                        # Explanation was cut off, close it properly
+                        cleaned = cleaned.rstrip()
+                        if not cleaned.endswith('"'):
+                            cleaned += '"'
+                        cleaned += '}'
                 
                 parsed = json.loads(cleaned)
                 score = int(float(parsed.get("ai_score", 50)))
                 explanation = parsed.get("explanation", "")
                 
-                # Truncate explanation if too long
-                if len(explanation) > 200:
-                    explanation = explanation[:197] + "..."
+                # Truncate explanation if too long (much higher limit for comprehensive analysis)
+                if len(explanation) > 1000:
+                    explanation = explanation[:997] + "..."
                 
                 scores.append((score, prompt_data['weight']))
                 explanations.append(explanation)
@@ -443,10 +474,10 @@ def analyze_with_nova_pro(text, bedrock):
     else:
         ensemble_score = 50
     
-    # Combine explanations, ensuring they're not cut off
+    # Combine explanations for comprehensive analysis
     final_explanation = " | ".join(filter(None, explanations[:2]))
-    if len(final_explanation) > 300:
-        final_explanation = final_explanation[:297] + "..."
+    if len(final_explanation) > 1500:
+        final_explanation = final_explanation[:1497] + "..."
     
     return ensemble_score, final_explanation
 
@@ -585,6 +616,17 @@ def calculate_final_score(linguistic_score, nova_score, comprehend_results, text
 def lambda_handler(event, context):
     """Main Lambda handler with enhanced detection."""
     
+    if event.get("httpMethod") == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": ""
+        }
+        
     # Parse input
     body = json.loads(event.get("body", "{}"))
     text = body.get("text", "").strip()
@@ -637,18 +679,33 @@ def lambda_handler(event, context):
         else:
             confidence = "low"
         
-        # 6. Generate explanation
+        # 6. Generate comprehensive explanation
         explanation_parts = []
         
+        # Add detailed linguistic analysis
         if linguistic_features.get("human_indicators"):
-            explanation_parts.append(f"Human patterns: {', '.join(linguistic_features['human_indicators'][:3])}")
+            human_indicators = linguistic_features['human_indicators'][:5]  # Show more indicators
+            explanation_parts.append(f"Human writing patterns detected: {', '.join(human_indicators)}")
+        
         if linguistic_features.get("ai_indicators"):
-            explanation_parts.append(f"AI patterns: {', '.join(linguistic_features['ai_indicators'][:3])}")
+            ai_indicators = linguistic_features['ai_indicators'][:5]  # Show more indicators
+            explanation_parts.append(f"AI writing patterns detected: {', '.join(ai_indicators)}")
         
+        # Add detailed model analysis
         if nova_explanation:
-            explanation_parts.append(f"Model analysis: {nova_explanation[:100]}")
+            explanation_parts.append(f"Advanced model analysis: {nova_explanation[:300]}")  # Longer model explanation
         
-        explanation = " | ".join(explanation_parts) if explanation_parts else "Analysis complete"
+        # Add semantic analysis insights
+        if comprehend_results.get("entities"):
+            entity_count = len(comprehend_results["entities"])
+            explanation_parts.append(f"Semantic analysis: {entity_count} entities identified, sentiment: {comprehend_results['sentiment']['primary']}")
+        
+        # Add complexity analysis
+        if linguistic_features.get("complexity_variation", 0) > 0:
+            explanation_parts.append("Natural sentence complexity variation detected")
+        
+        # Combine all explanations
+        explanation = " | ".join(explanation_parts) if explanation_parts else "Comprehensive analysis completed"
         
         # 7. Store in DynamoDB
         item = {
@@ -657,7 +714,7 @@ def lambda_handler(event, context):
             "input_text": text[:1000],
             "ai_score": final_score,
             "confidence": confidence,
-            "explanation": explanation[:500],
+            "explanation": explanation[:1000],  # Store longer explanations
             "linguistic_features": json.dumps(linguistic_features),
             "sentiment": comprehend_results["sentiment"],
             "entities": comprehend_results["entities"][:5],
@@ -685,7 +742,7 @@ def lambda_handler(event, context):
                 },
                 "model_analysis": {
                     "score": nova_score,
-                    "explanation": nova_explanation[:200]
+                    "explanation": nova_explanation[:500]  # Longer model explanations
                 },
                 "semantic_analysis": {
                     "sentiment": comprehend_results["sentiment"]["primary"],
