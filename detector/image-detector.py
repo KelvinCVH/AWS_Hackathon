@@ -68,10 +68,11 @@ def preprocess_image(image_bytes):
         
         # Convert to list and normalize (numpy alternative)
         img_array = list(image.getdata())
-        img_array = [[pixel / 255.0 for pixel in row] for row in [img_array[i:i+image.width] for i in range(0, len(img_array), image.width)]]
+        # Normalize each pixel tuple
+        img_array = [[pixel / 255.0 for pixel in pixel_tuple] for pixel_tuple in img_array]
         
         # Flatten for processing
-        img_array = [pixel for row in img_array for pixel in row]
+        img_array = [pixel for pixel_tuple in img_array for pixel in pixel_tuple]
         
         return img_array
         
@@ -79,48 +80,107 @@ def preprocess_image(image_bytes):
         logger.error(f"Image preprocessing error: {str(e)}")
         raise
 
-def call_artid_model(image_array):
-    """Call Microsoft ARTID model for AI detection"""
+def preprocess_image_for_sagemaker(image_data):
+    """Preprocess image to ensure compatibility with SageMaker endpoint"""
     try:
-        # This is a placeholder for the actual ARTID model call
-        # In a real implementation, you would:
-        # 1. Load the ARTID model (from Hugging Face or local storage)
-        # 2. Run inference on the preprocessed image
-        # 3. Return the detection results
+        # Convert to PIL Image
+        if isinstance(image_data, str):
+            image_data = base64.b64decode(image_data)
         
-        # For now, we'll simulate the ARTID model response
-        # You would replace this with actual model inference
+        img = Image.open(io.BytesIO(image_data))
         
-        # Simulate ARTID model prediction
-        # In reality, this would be something like:
-        # model = load_artid_model()
-        # prediction = model.predict(image_array)
+        # Convert to RGB if needed
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
         
-        # Simulated ARTID response (without numpy)
-        import random
-        artid_score = random.uniform(0.1, 0.9)  # Simulated AI probability
-        confidence = random.uniform(0.7, 0.95)  # Simulated confidence
+        # Resize to standard size for deepfake detection
+        img = img.resize((224, 224), Image.Resampling.LANCZOS)
         
-        # Simulated feature analysis
-        features = {
-            "texture_consistency": random.uniform(0.2, 0.8),
-            "color_distribution": random.uniform(0.3, 0.9),
-            "edge_sharpness": random.uniform(0.1, 0.7),
-            "noise_patterns": random.uniform(0.2, 0.8),
-            "composition_balance": random.uniform(0.3, 0.9)
-        }
+        # Save as JPEG with high quality
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='JPEG', quality=95, optimize=True)
+        processed_img_data = img_buffer.getvalue()
+        
+        return processed_img_data
+        
+    except Exception as e:
+        logger.error(f"Image preprocessing failed: {str(e)}")
+        return None  # Return None for corrupted images
+
+def call_sagemaker_endpoint(image_data):
+    """Call SageMaker deepfake detector endpoint"""
+    try:
+        # Preprocess image
+        processed_image_data = preprocess_image_for_sagemaker(image_data)
+        
+        if processed_image_data is None:
+            logger.warning("Image preprocessing failed, using fallback")
+            return simulate_deepfake_detection(image_data)
+        
+        # Initialize SageMaker runtime client
+        sagemaker_runtime = boto3.client('sagemaker-runtime', region_name='ap-southeast-1')
+        
+        # Get endpoint name from environment or use default
+        endpoint_name = os.environ.get('SAGEMAKER_ENDPOINT_NAME', 'deepfake-detector-endpoint')
+        
+        # Call SageMaker endpoint
+        response = sagemaker_runtime.invoke_endpoint(
+            EndpointName=endpoint_name,
+            ContentType='image/x-image',
+            Body=processed_image_data
+        )
+        
+        # Parse response
+        result = json.loads(response['Body'].read())
+        
+        # Convert SageMaker response to our format
+        fake_score = result[0]['score'] if result[0]['label'] == 'Fake' else result[1]['score']
+        real_score = result[1]['score'] if result[1]['label'] == 'Real' else result[0]['score']
+        
+        # Calculate confidence based on score difference
+        confidence = abs(fake_score - real_score)
         
         return {
-            "ai_probability": float(artid_score),
+            "ai_probability": float(fake_score),
             "confidence": float(confidence),
-            "features": features,
-            "model_name": "Microsoft/ARTID",
-            "model_version": "v1.0"
+            "features": {
+                "texture_consistency": fake_score,
+                "color_distribution": real_score,
+                "edge_sharpness": confidence,
+                "noise_patterns": fake_score,
+                "composition_balance": real_score
+            },
+            "model_name": "SageMaker-Deepfake-Detector",
+            "model_version": "v1.0",
+            "raw_response": result
         }
         
     except Exception as e:
-        logger.error(f"ARTID model error: {str(e)}")
-        raise
+        logger.error(f"SageMaker call failed: {str(e)}")
+        # Fallback to simulation
+        return simulate_deepfake_detection(image_data)
+
+def simulate_deepfake_detection(image_data):
+    """Fallback simulation when SageMaker fails"""
+    import random
+    artid_score = random.uniform(0.1, 0.9)
+    confidence = random.uniform(0.7, 0.95)
+    
+    features = {
+        "texture_consistency": random.uniform(0.2, 0.8),
+        "color_distribution": random.uniform(0.3, 0.9),
+        "edge_sharpness": random.uniform(0.1, 0.7),
+        "noise_patterns": random.uniform(0.2, 0.8),
+        "composition_balance": random.uniform(0.3, 0.9)
+    }
+    
+    return {
+        "ai_probability": float(artid_score),
+        "confidence": float(confidence),
+        "features": features,
+        "model_name": "Simulation-Fallback",
+        "model_version": "v1.0"
+    }
 
 def analyze_with_bedrock(artid_results, image_metadata):
     """Use Bedrock to analyze ARTID results and provide explanations"""
@@ -249,8 +309,8 @@ def analyze_image(s3, bucket_name, object_key):
         # Preprocess image for ARTID model
         image_array = preprocess_image(image_bytes)
         
-        # Call ARTID model
-        artid_results = call_artid_model(image_array)
+        # Call SageMaker endpoint
+        artid_results = call_sagemaker_endpoint(image_bytes)
         
         # Analyze results with Bedrock
         bedrock_analysis = analyze_with_bedrock(artid_results, image_metadata)

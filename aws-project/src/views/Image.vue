@@ -313,7 +313,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const selectedImage = ref(null)
 const imagePreview = ref('')
@@ -417,7 +417,7 @@ const resetResults = () => {
 }
 
 // API configuration
-const API_URL = process.env.VUE_APP_IMAGE_API_URL || "https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/Prod/process-image"
+const API_URL = import.meta.env.VUE_APP_IMAGE_API_URL || "https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/Prod/process-image"
 
 const generateUniqueFileName = (originalName) => {
   const timestamp = Date.now()

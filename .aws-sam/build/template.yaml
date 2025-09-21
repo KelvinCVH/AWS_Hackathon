@@ -178,6 +178,7 @@ Resources:
           BEDROCK_REGION: us-east-1
           DATA_REGION: ap-southeast-5
           BUCKET_NAME: ai-detection-images
+          SAGEMAKER_ENDPOINT_NAME: deepfake-detector-endpoint-20250921142635
     Metadata:
       SamResourceId: ImageDetectorFunction
   ContentDetectionsTable:
