@@ -345,17 +345,17 @@
 
         <!-- Quick Stats -->
         <div class="grid grid-cols-3 gap-4">
-          <div class="bg-white rounded-lg border p-4 text-center">
-            <p class="text-xs text-gray-600 mb-1">Words Analyzed</p>
-            <p class="text-xl font-bold text-gray-800">{{ wordCount }}</p>
+          <div class="bg-white rounded-lg border p-3 text-center">
+            <p class="text-xs text-gray-600 mb-1">Model Used</p>
+            <p class="text-sm font-medium text-gray-800">Nova Pro v1</p>
           </div>
-          <div class="bg-white rounded-lg border p-4 text-center">
-            <p class="text-xs text-gray-600 mb-1">Analysis Time</p>
-            <p class="text-xl font-bold text-gray-800">{{ analysisTime }}s</p>
+          <div class="bg-white rounded-lg border p-3 text-center">
+            <p class="text-xs text-gray-600 mb-1">Confidence</p>
+            <p class="text-sm font-medium text-gray-800">{{ results.confidence || 'Medium' }}</p>
           </div>
-          <div class="bg-white rounded-lg border p-4 text-center">
-            <p class="text-xs text-gray-600 mb-1">Model Version</p>
-            <p class="text-xl font-bold text-gray-800">v2</p>
+          <div class="bg-white rounded-lg border p-3 text-center">
+            <p class="text-xs text-gray-600 mb-1">Analysis Version</p>
+            <p class="text-sm font-medium text-gray-800">v2.0</p>
           </div>
         </div>
       </div>

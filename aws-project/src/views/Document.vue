@@ -1,439 +1,439 @@
 <template>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-screen">
-    <!-- Left Side - Upload -->
-    <div class="space-y-6">
-      <div>
+        <!-- Left Side - Upload -->
+        <div class="space-y-6">
+          <div>
         <h2 class="text-2xl font-bold text-[#252F3E] mb-4">Upload Document to Analyze</h2>
         
-        <!-- File Upload Area -->
-        <div 
-          @drop="handleDrop"
-          @dragover.prevent
-          @dragenter.prevent
-          :class="[
+          <!-- File Upload Area -->
+          <div 
+            @drop="handleDrop"
+            @dragover.prevent
+            @dragenter.prevent
+            :class="[
             'relative border-2 border-dashed rounded-lg p-8 text-center transition-colors',
             isDragging ? 'border-[#FF9900] bg-orange-50' : 'border-gray-300 hover:border-[#FF9900]'
-          ]"
-        >
-          <input
-            ref="fileInput"
-            type="file"
-            accept=".pdf,.doc,.docx,.txt"
-            @change="handleFileSelect"
-            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          />
-          
+            ]"
+          >
+            <input
+              ref="fileInput"
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              @change="handleFileSelect"
+              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            
           <div v-if="!selectedFile" class="space-y-4">
             <div class="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-              </svg>
-            </div>
-            <div>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+              </div>
+              <div>
               <p class="text-lg font-medium text-gray-700">Drop your document here</p>
               <p class="text-sm text-gray-500">or click to browse files</p>
               <p class="text-xs text-gray-400 mt-2">Supports PDF, DOC, DOCX, TXT (max 10MB)</p>
+              </div>
             </div>
-          </div>
-          
-          <!-- Selected File Display -->
+            
+            <!-- Selected File Display -->
           <div v-if="selectedFile" class="space-y-4">
             <div class="mx-auto w-16 h-16 bg-[#FF9900] rounded-full flex items-center justify-center">
               <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-            </div>
+                </svg>
+              </div>
             <div>
               <p class="text-lg font-medium text-gray-700">{{ selectedFile.name }}</p>
               <p class="text-sm text-gray-500">{{ formatFileSize(selectedFile.size) }}</p>
-              <button 
-                @click="clearFile"
+                <button 
+                  @click="clearFile"
                 class="text-xs text-red-500 hover:text-red-700 mt-2"
-              >
-                Remove file
-              </button>
+                >
+                  Remove file
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Document Preview -->
+          <div v-if="documentContent" class="mt-4">
+            <h3 class="text-sm font-medium text-[#252F3E] mb-2">Document Preview</h3>
+            <div class="bg-gray-50 border rounded-lg p-4 max-h-48 overflow-y-auto">
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ documentPreview }}</p>
+              <p v-if="documentContent.length > 500" class="text-xs text-gray-500 mt-2">
+                ... and {{ Math.max(0, wordCount - 100) }} more words
+              </p>
+            </div>
+            <div class="mt-2 text-sm text-gray-500">
+              {{ wordCount }} words extracted
+          </div>
+            </div>
+          </div>
+        
+          <button
+            @click="analyzeDocument"
+            :disabled="!selectedFile || isAnalyzing"
+            :class="[
+          'w-full py-3 px-6 rounded-lg font-medium transition-colors',
+              !selectedFile || isAnalyzing
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-[#FF9900] text-white hover:bg-[#E68A00] shadow-lg'
+            ]"
+          >
+            {{ isAnalyzing ? getLoadingText() : 'Analyze Document' }}
+          </button>
+
+          <!-- Upload Progress -->
+          <div v-if="uploadProgress > 0 && uploadProgress < 100" class="w-full">
+            <div class="flex justify-between text-sm text-gray-600 mb-1">
+              <span>Processing...</span>
+              <span>{{ uploadProgress }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                class="bg-[#FF9900] h-2 rounded-full transition-all duration-300"
+                :style="{ width: uploadProgress + '%' }"
+              ></div>
             </div>
           </div>
         </div>
 
-        <!-- Document Preview -->
-        <div v-if="documentContent" class="mt-4">
-          <h3 class="text-sm font-medium text-[#252F3E] mb-2">Document Preview</h3>
-          <div class="bg-gray-50 border rounded-lg p-4 max-h-48 overflow-y-auto">
-            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ documentPreview }}</p>
-            <p v-if="documentContent.length > 500" class="text-xs text-gray-500 mt-2">
-              ... and {{ Math.max(0, wordCount - 100) }} more words
-            </p>
-          </div>
-          <div class="mt-2 text-sm text-gray-500">
-            {{ wordCount }} words extracted
-          </div>
-        </div>
-      </div>
-      
-      <button
-        @click="analyzeDocument"
-        :disabled="!selectedFile || isAnalyzing"
-        :class="[
-          'w-full py-3 px-6 rounded-lg font-medium transition-colors',
-          !selectedFile || isAnalyzing
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-[#FF9900] text-white hover:bg-[#E68A00] shadow-lg'
-        ]"
-      >
-        {{ isAnalyzing ? getLoadingText() : 'Analyze Document' }}
-      </button>
-
-      <!-- Upload Progress -->
-      <div v-if="uploadProgress > 0 && uploadProgress < 100" class="w-full">
-        <div class="flex justify-between text-sm text-gray-600 mb-1">
-          <span>Processing...</span>
-          <span>{{ uploadProgress }}%</span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            class="bg-[#FF9900] h-2 rounded-full transition-all duration-300"
-            :style="{ width: uploadProgress + '%' }"
-          ></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Side - Results -->
-    <div class="space-y-6 lg:sticky lg:top-8 lg:h-fit">
-      <div>
+        <!-- Right Side - Results -->
+        <div class="space-y-6 lg:sticky lg:top-8 lg:h-fit">
+              <div>
         <h2 class="text-2xl font-bold text-[#252F3E] mb-4">Detection Results</h2>
-        
-        <!-- Empty State -->
+            
+            <!-- Empty State -->
         <div v-if="!hasResults && !isAnalyzing && !error" class="text-center py-12">
           <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+                </svg>
           <p class="text-gray-500">Upload a document above to see detection results</p>
-        </div>
+            </div>
 
-        <!-- Loading State -->
+            <!-- Loading State -->
         <div v-if="isAnalyzing" class="text-center py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF9900] mx-auto mb-4"></div>
           <p class="text-gray-600">{{ getLoadingText() }}</p>
           <p class="text-sm text-gray-500 mt-2">{{ analysisStep }}</p>
-        </div>
-
-        <!-- Error State -->
-        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div class="flex items-center">
-            <svg class="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div class="flex-1">
-              <h4 class="text-red-800 font-medium">Analysis Failed</h4>
-              <p class="text-red-700 text-sm mt-1">{{ error }}</p>
-              <button @click="retryAnalysis" 
-                      class="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded">
-                Try Again
-              </button>
             </div>
-          </div>
-        </div>
 
-        <!-- Results Display -->
-        <div v-if="hasResults && !isAnalyzing && !error" class="space-y-6">
-          
-          <!-- Main Score Card -->
-          <div class="bg-white rounded-xl shadow-lg border p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold text-gray-800">AI Detection Score</h3>
-              <span :class="['px-3 py-1 rounded-full text-sm font-medium', confidenceBadgeClass]">
-                {{ results.confidence || 'Medium' }} Confidence
-              </span>
-            </div>
-            
-            <!-- Score Circle and Interpretation -->
-            <div class="flex items-center space-x-6">
-              <div class="relative">
-                <svg class="w-32 h-32 transform -rotate-90">
-                  <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none" />
-                  <circle cx="64" cy="64" r="56" 
-                          :stroke="scoreColor" 
-                          stroke-width="12" 
-                          fill="none"
-                          stroke-linecap="round"
-                          :stroke-dasharray="circumference"
-                          :stroke-dashoffset="strokeDashoffset" 
-                          class="transition-all duration-1000 ease-out" />
+            <!-- Error State -->
+            <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div class="flex items-center">
+                <svg class="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="text-center">
-                    <div class="text-3xl font-bold" :class="resultTextColor">
-                      {{ Math.round(results.ai_score || results.aiProbability || 50) }}%
-                    </div>
-                    <div class="text-xs text-gray-500">AI Score</div>
-                  </div>
+                <div class="flex-1">
+                  <h4 class="text-red-800 font-medium">Analysis Failed</h4>
+                  <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                  <button @click="retryAnalysis" 
+                          class="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded">
+                    Try Again
+                  </button>
                 </div>
-              </div>
-              
-              <div class="flex-1">
-                <div class="text-xl font-semibold mb-2" :class="resultTextColor">
-                  {{ results.classification || getClassification(results.ai_score || results.aiProbability || 50) }}
-                </div>
-                <p class="text-sm text-gray-600">
-                  {{ interpretationDetail }}
-                </p>
               </div>
             </div>
-          </div>
 
-          <!-- Analysis Section Dropdown -->
-          <div class="bg-white rounded-xl shadow-lg border">
-            <div class="border-b p-6">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800">Analysis Results</h3>
-                <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  {{ getCurrentSectionDescription() }}
-                </span>
-              </div>
+            <!-- Results Display -->
+            <div v-if="hasResults && !isAnalyzing && !error" class="space-y-6">
               
-              <!-- Dropdown Selector -->
-              <div class="relative">
-                <select 
-                  v-model="selectedAnalysisSection" 
-                  @change="activeTab = selectedAnalysisSection"
-                  class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF9900] focus:border-[#FF9900] transition-colors bg-white"
-                >
-                  <option 
-                    v-for="section in tabs" 
-                    :key="section.id" 
-                    :value="section.id"
-                    class="py-2"
-                  >
-                    {{ section.label }}
-                  </option>
-                </select>
-                
-                <!-- Dropdown Icon -->
-                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </div>
-              </div>
-              
-              <!-- Current Section Indicator -->
-              <div class="mt-4 p-3 bg-[#FF9900]/10 border border-[#FF9900]/20 rounded-lg">
-                <div class="flex items-center text-sm text-[#FF9900]">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  Currently viewing: <strong>{{ getCurrentSectionLabel() }}</strong>
-                </div>
-              </div>
-            </div>
-            
-            <div class="p-6">
-              <!-- Document Info Tab -->
-              <div v-show="activeTab === 'document'" class="space-y-6">
+              <!-- Main Score Card -->
+              <div class="bg-white rounded-xl shadow-lg border p-6">
                 <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-semibold text-gray-800">Document Information</h4>
-                  <span class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                    Analysis Details
+                  <h3 class="text-lg font-semibold text-gray-800">AI Detection Score</h3>
+                  <span :class="['px-3 py-1 rounded-full text-sm font-medium', confidenceBadgeClass]">
+                    {{ results.confidence || 'Medium' }} Confidence
                   </span>
                 </div>
-
                 
-                <!-- Document Overview -->
-                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-l-4 border-blue-400">
-                  <div class="flex items-center mb-6">
-                    <svg class="w-6 h-6 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <!-- Score Circle and Interpretation -->
+                <div class="flex items-center space-x-6">
+                  <div class="relative">
+                    <svg class="w-32 h-32 transform -rotate-90">
+                      <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none" />
+                      <circle cx="64" cy="64" r="56" 
+                              :stroke="scoreColor" 
+                              stroke-width="12" 
+                              fill="none"
+                              stroke-linecap="round"
+                              :stroke-dasharray="circumference"
+                              :stroke-dashoffset="strokeDashoffset" 
+                              class="transition-all duration-1000 ease-out" />
                     </svg>
-                    <h5 class="font-semibold text-gray-800 text-lg">Document Overview</h5>
-                  </div>
-                  
-                  <!-- Document Information Grid -->
-                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Left Column -->
-                    <div class="space-y-4">
-                      <div class="bg-white rounded-lg p-4 border border-gray-200">
-                        <div class="flex items-center mb-3">
-                          <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                          </svg>
-                          <h6 class="font-medium text-gray-700">File Information</h6>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="text-center">
+                        <div class="text-3xl font-bold" :class="resultTextColor">
+                          {{ Math.round(results.ai_score || results.aiProbability || 50) }}%
                         </div>
-                        <div class="space-y-3">
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Name</span>
-                            <span class="text-sm font-medium text-gray-800 break-all">{{ selectedFile?.name || 'Unknown' }}</span>
-                          </div>
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Size</span>
-                            <span class="text-sm font-medium text-gray-800">{{ formatFileSize(selectedFile?.size || 0) }}</span>
-                          </div>
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Type</span>
-                            <span class="text-sm font-medium text-gray-800 break-all">{{ selectedFile?.type || 'Unknown' }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <!-- Right Column -->
-                    <div class="space-y-4">
-                      <div class="bg-white rounded-lg p-4 border border-gray-200">
-                        <div class="flex items-center mb-3">
-                          <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                          </svg>
-                          <h6 class="font-medium text-gray-700">Analysis Details</h6>
-                        </div>
-                        <div class="space-y-3">
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Text Length</span>
-                            <span class="text-sm font-medium text-gray-800">{{ results.text_length || results.textLength || wordCount }} words</span>
-                          </div>
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Extraction Method</span>
-                            <span class="text-sm font-medium text-gray-800">{{ results.extraction_method || results.extractionMethod || 'Auto' }}</span>
-                          </div>
-                          <div class="flex flex-col">
-                            <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Analysis Version</span>
-                            <span class="text-sm font-medium text-gray-800">{{ results.analysis_version || results.modelVersion || 'academic_journal_v1' }}</span>
-                          </div>
-                        </div>
+                        <div class="text-xs text-gray-500">AI Score</div>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <!-- Analysis Summary -->
-                <div class="bg-white border rounded-lg p-4">
-                  <h5 class="font-medium text-gray-800 mb-3 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    Analysis Summary
-                  </h5>
                   
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div class="text-2xl font-bold text-blue-600">{{ results.text_length || results.textLength || wordCount }}</div>
-                      <div class="text-xs text-gray-600">Words Analyzed</div>
+                  <div class="flex-1">
+                    <div class="text-xl font-semibold mb-2" :class="resultTextColor">
+                      {{ results.classification || getClassification(results.ai_score || results.aiProbability || 50) }}
                     </div>
-                    <div class="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                      <div class="text-2xl font-bold text-green-600">{{ results.key_phrases?.length || results.keyPhrases?.length || 0 }}</div>
-                      <div class="text-xs text-gray-600">Key Phrases</div>
-                    </div>
-                    <div class="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-                      <div class="text-2xl font-bold text-purple-600">{{ results.comprehend_analysis?.entities?.length || results.comprehendAnalysis?.entities?.length || 0 }}</div>
-                      <div class="text-xs text-gray-600">Entities Found</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Academic Analysis Status -->
-                <div v-if="results.academicAnalysis || results.integrityDashboard" 
-                     class="bg-white border rounded-lg p-4">
-                  <h5 class="font-medium text-gray-800 mb-3 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                    </svg>
-                    Academic Analysis Status
-                  </h5>
-                  
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <span class="text-sm text-green-800">Academic Analysis</span>
-                      <span class="text-sm font-medium text-green-600">✅ Available</span>
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <span class="text-sm text-green-800">Integrity Dashboard</span>
-                      <span class="text-sm font-medium text-green-600">✅ Available</span>
-                    </div>
-                  </div>
-                  
-                  <div v-if="results.academicAnalysis" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                      <div class="text-xl font-bold text-orange-600">{{ results.academicAnalysis.citations_found || 0 }}</div>
-                      <div class="text-xs text-gray-600">Citations Found</div>
-                    </div>
-                    <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div class="text-xl font-bold text-blue-600">{{ results.academicAnalysis.sections_analyzed || 0 }}</div>
-                      <div class="text-xs text-gray-600">Sections Analyzed</div>
-                    </div>
-                    <div class="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-                      <div class="text-xl font-bold text-red-600">{{ results.academicAnalysis.high_ai_sections?.length || 0 }}</div>
-                      <div class="text-xs text-gray-600">High AI Sections</div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- Detection Analysis Tab -->
-              <div v-show="activeTab === 'detection'" class="space-y-4">
-                <h4 class="font-semibold text-gray-800 mb-3">AI Detection Analysis</h4>
-                
-                <!-- Main Score Breakdown -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <p class="text-sm font-medium text-gray-700">Overall AI Probability</p>
-                    <span class="text-lg font-bold" :class="resultTextColor">
-                      {{ Math.round(results.ai_score || results.aiProbability || 50) }}%
-                    </span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div 
-                      class="h-3 rounded-full transition-all duration-1000 ease-out"
-                      :class="progressBarColor"
-                      :style="{ width: (results.ai_score || results.aiProbability || 50) + '%' }"
-                    ></div>
-                  </div>
-                </div>
-
-                <!-- Detection Explanation -->
-                <div v-if="results.explanation" class="space-y-4">
-                  <h5 class="text-sm font-medium text-gray-700">Detection Reasoning</h5>
-                  
-                  <!-- Main Analysis Text -->
-                  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p class="text-sm text-blue-800 leading-relaxed">
-                      {{ getMainAnalysisText(results.explanation) }}
+                    <p class="text-sm text-gray-600">
+                      {{ interpretationDetail }}
                     </p>
                   </div>
+                </div>
+              </div>
 
-                  <!-- Metrics Grid -->
-                  <div v-if="hasMetrics(results.explanation)" class="grid grid-cols-2 gap-4">
-                    <div v-for="metric in parseMetrics(results.explanation)" 
-                         :key="metric.name"
-                         class="bg-gray-50 rounded-lg p-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">{{ metric.label }}</span>
-                        <span class="text-lg font-bold" :class="getMetricColor(metric.value)">
-                          {{ metric.value }}%
-                        </span>
-                      </div>
-                      <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          class="h-2 rounded-full transition-all duration-1000 ease-out"
-                          :class="getMetricBarColor(metric.value)"
-                          :style="{ width: metric.value + '%' }"
-                        ></div>
-                      </div>
-                      <p class="text-xs text-gray-500 mt-1">{{ getMetricDescription(metric.name, metric.value) }}</p>
+              <!-- Analysis Section Dropdown -->
+              <div class="bg-white rounded-xl shadow-lg border">
+                <div class="border-b p-6">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Analysis Results</h3>
+                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                      {{ getCurrentSectionDescription() }}
+                    </span>
+                  </div>
+                  
+                  <!-- Dropdown Selector -->
+                  <div class="relative">
+                    <select 
+                      v-model="selectedAnalysisSection" 
+                      @change="activeTab = selectedAnalysisSection"
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF9900] focus:border-[#FF9900] transition-colors bg-white"
+                    >
+                      <option 
+                        v-for="section in tabs" 
+                        :key="section.id" 
+                        :value="section.id"
+                        class="py-2"
+                      >
+                        {{ section.label }}
+                      </option>
+                    </select>
+                    
+                    <!-- Dropdown Icon -->
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
                     </div>
                   </div>
-
-                  <!-- Confidence Level -->
-                  <div v-if="hasConfidence(results.explanation)" class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div class="flex items-center justify-between">
-                      <span class="text-sm font-medium text-green-800">Analysis Confidence</span>
-                      <span class="text-sm font-bold text-green-700">{{ getConfidenceLevel(results.explanation) }}</span>
+                  
+                  <!-- Current Section Indicator -->
+                  <div class="mt-4 p-3 bg-[#FF9900]/10 border border-[#FF9900]/20 rounded-lg">
+                    <div class="flex items-center text-sm text-[#FF9900]">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      Currently viewing: <strong>{{ getCurrentSectionLabel() }}</strong>
                     </div>
                   </div>
                 </div>
-              </div>
+                
+                <div class="p-6">
+                  <!-- Document Info Tab -->
+                  <div v-show="activeTab === 'document'" class="space-y-6">
+                    <div class="flex items-center justify-between mb-4">
+                      <h4 class="font-semibold text-gray-800">Document Information</h4>
+                      <span class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                        Analysis Details
+                      </span>
+                    </div>
+
+                    
+                    <!-- Document Overview -->
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-l-4 border-blue-400">
+                      <div class="flex items-center mb-6">
+                        <svg class="w-6 h-6 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <h5 class="font-semibold text-gray-800 text-lg">Document Overview</h5>
+                      </div>
+                      
+                      <!-- Document Information Grid -->
+                      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Left Column -->
+                        <div class="space-y-4">
+                          <div class="bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-center mb-3">
+                              <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                              </svg>
+                              <h6 class="font-medium text-gray-700">File Information</h6>
+                            </div>
+                            <div class="space-y-3">
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Name</span>
+                                <span class="text-sm font-medium text-gray-800 break-all">{{ selectedFile?.name || 'Unknown' }}</span>
+                              </div>
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Size</span>
+                                <span class="text-sm font-medium text-gray-800">{{ formatFileSize(selectedFile?.size || 0) }}</span>
+                              </div>
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">File Type</span>
+                                <span class="text-sm font-medium text-gray-800 break-all">{{ selectedFile?.type || 'Unknown' }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- Right Column -->
+                        <div class="space-y-4">
+                          <div class="bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-center mb-3">
+                              <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                              </svg>
+                              <h6 class="font-medium text-gray-700">Analysis Details</h6>
+                            </div>
+                            <div class="space-y-3">
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Text Length</span>
+                                <span class="text-sm font-medium text-gray-800">{{ results.text_length || results.textLength || wordCount }} words</span>
+                              </div>
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Extraction Method</span>
+                                <span class="text-sm font-medium text-gray-800">{{ results.extraction_method || results.extractionMethod || 'Auto' }}</span>
+                              </div>
+                              <div class="flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase tracking-wide mb-1">Analysis Version</span>
+                                <span class="text-sm font-medium text-gray-800">{{ results.analysis_version || results.modelVersion || 'academic_journal_v1' }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Analysis Summary -->
+                    <div class="bg-white border rounded-lg p-4">
+                      <h5 class="font-medium text-gray-800 mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Analysis Summary
+                      </h5>
+                      
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div class="text-2xl font-bold text-blue-600">{{ results.text_length || results.textLength || wordCount }}</div>
+                          <div class="text-xs text-gray-600">Words Analyzed</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div class="text-2xl font-bold text-green-600">{{ results.key_phrases?.length || results.keyPhrases?.length || 0 }}</div>
+                          <div class="text-xs text-gray-600">Key Phrases</div>
+                        </div>
+                        <div class="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <div class="text-2xl font-bold text-purple-600">{{ results.comprehend_analysis?.entities?.length || results.comprehendAnalysis?.entities?.length || 0 }}</div>
+                          <div class="text-xs text-gray-600">Entities Found</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Academic Analysis Status -->
+                    <div v-if="results.academicAnalysis || results.integrityDashboard" 
+                         class="bg-white border rounded-lg p-4">
+                      <h5 class="font-medium text-gray-800 mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                        Academic Analysis Status
+                      </h5>
+                      
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <span class="text-sm text-green-800">Academic Analysis</span>
+                          <span class="text-sm font-medium text-green-600">✅ Available</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <span class="text-sm text-green-800">Integrity Dashboard</span>
+                          <span class="text-sm font-medium text-green-600">✅ Available</span>
+                        </div>
+                      </div>
+                      
+                      <div v-if="results.academicAnalysis" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div class="text-xl font-bold text-orange-600">{{ results.academicAnalysis.citations_found || 0 }}</div>
+                          <div class="text-xs text-gray-600">Citations Found</div>
+                        </div>
+                        <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div class="text-xl font-bold text-blue-600">{{ results.academicAnalysis.sections_analyzed || 0 }}</div>
+                          <div class="text-xs text-gray-600">Sections Analyzed</div>
+                        </div>
+                        <div class="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                          <div class="text-xl font-bold text-red-600">{{ results.academicAnalysis.high_ai_sections?.length || 0 }}</div>
+                          <div class="text-xs text-gray-600">High AI Sections</div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <!-- Detection Analysis Tab -->
+                  <div v-show="activeTab === 'detection'" class="space-y-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">AI Detection Analysis</h4>
+                    
+                    <!-- Main Score Breakdown -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <p class="text-sm font-medium text-gray-700">Overall AI Probability</p>
+                        <span class="text-lg font-bold" :class="resultTextColor">
+                          {{ Math.round(results.ai_score || results.aiProbability || 50) }}%
+                        </span>
+                      </div>
+                      <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          class="h-3 rounded-full transition-all duration-1000 ease-out"
+                          :class="progressBarColor"
+                          :style="{ width: (results.ai_score || results.aiProbability || 50) + '%' }"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <!-- Detection Explanation -->
+                    <div v-if="results.explanation" class="space-y-4">
+                      <h5 class="text-sm font-medium text-gray-700">Detection Reasoning</h5>
+                      
+                      <!-- Main Analysis Text -->
+                      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm text-blue-800 leading-relaxed">
+                          {{ getMainAnalysisText(results.explanation) }}
+                        </p>
+                      </div>
+
+                      <!-- Metrics Grid -->
+                      <div v-if="hasMetrics(results.explanation)" class="grid grid-cols-2 gap-4">
+                        <div v-for="metric in parseMetrics(results.explanation)" 
+                             :key="metric.name"
+                             class="bg-gray-50 rounded-lg p-4">
+                          <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">{{ metric.label }}</span>
+                            <span class="text-lg font-bold" :class="getMetricColor(metric.value)">
+                              {{ metric.value }}%
+                            </span>
+                          </div>
+                          <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              class="h-2 rounded-full transition-all duration-1000 ease-out"
+                              :class="getMetricBarColor(metric.value)"
+                              :style="{ width: metric.value + '%' }"
+                            ></div>
+                          </div>
+                          <p class="text-xs text-gray-500 mt-1">{{ getMetricDescription(metric.name, metric.value) }}</p>
+                        </div>
+                      </div>
+
+                      <!-- Confidence Level -->
+                      <div v-if="hasConfidence(results.explanation)" class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                          <span class="text-sm font-medium text-green-800">Analysis Confidence</span>
+                          <span class="text-sm font-bold text-green-700">{{ getConfidenceLevel(results.explanation) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
               <!-- Rubric Analysis Tab -->
               <div v-show="activeTab === 'rubric'" class="space-y-6">
@@ -460,23 +460,23 @@
                         <div class="text-sm text-gray-600 mt-1">
                           {{ results.classification }}
                         </div>
-                      </div>
-                    </div>
-                    
+                </div>
+              </div>
+
                     <!-- Score Bar -->
                     <div class="w-full bg-gray-200 rounded-full h-3 mb-3">
                       <div class="h-3 rounded-full transition-all duration-500" 
                            :class="getScoreColor(results.aiProbability).replace('text-', 'bg-')"
                            :style="`width: ${results.aiProbability}%`"></div>
-                    </div>
+                </div>
                     
                     <div class="flex items-center justify-between text-sm">
                       <span class="text-gray-600">Confidence: <span class="font-semibold" :class="getConfidenceClass(results.confidence)">{{ results.confidence }}</span></span>
                       <span v-if="results.aiProbability > 70" class="text-red-600 font-medium">🚨 High AI Probability</span>
                       <span v-else-if="results.aiProbability < 40" class="text-green-600 font-medium">✅ Likely Human</span>
                       <span v-else class="text-orange-600 font-medium">⚠️ Mixed Content</span>
-                    </div>
-                  </div>
+                </div>
+                </div>
 
                   <!-- Category Breakdown -->
                   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -487,13 +487,13 @@
                         <span class="text-sm font-semibold" :class="getScoreColor(results.rubricBreakdown.perplexity_burstiness.score)">
                           {{ results.rubricBreakdown.perplexity_burstiness.score }}/15
                         </span>
-                      </div>
+              </div>
                       <div class="text-xs text-gray-600 space-y-1">
                         <div v-for="detail in results.rubricBreakdown.perplexity_burstiness.details?.slice(0, 2)" :key="detail">
                           • {{ detail }}
-                        </div>
-                      </div>
-                    </div>
+            </div>
+          </div>
+        </div>
 
                     <!-- Repetitiveness & Redundancy -->
                     <div v-if="results.rubricBreakdown.repetitiveness_redundancy" class="bg-white border rounded-lg p-4">
@@ -1295,17 +1295,17 @@
 
           <!-- Quick Stats -->
           <div class="grid grid-cols-3 gap-4">
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Words Analyzed</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.textLength || wordCount }}</p>
+            <div class="bg-white rounded-lg border p-3 text-center">
+              <p class="text-xs text-gray-600 mb-1">Model Used</p>
+              <p class="text-sm font-medium text-gray-800">Nova Pro v1</p>
             </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Confidence Level</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.confidence || 'Medium' }}</p>
+            <div class="bg-white rounded-lg border p-3 text-center">
+              <p class="text-xs text-gray-600 mb-1">Confidence</p>
+              <p class="text-sm font-medium text-gray-800">{{ results.confidence || 'Medium' }}</p>
             </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">File Type</p>
-              <p class="text-xl font-bold text-gray-800">{{ getFileExtension() }}</p>
+            <div class="bg-white rounded-lg border p-3 text-center">
+              <p class="text-xs text-gray-600 mb-1">Analysis Version</p>
+              <p class="text-sm font-medium text-gray-800">v2.0</p>
             </div>
           </div>
         </div>
