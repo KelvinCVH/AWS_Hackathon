@@ -41,7 +41,8 @@ AI-Content-Detector-on-AWS. An AI-powered system built with AWS services that de
 - Bedrock
 
 ### Other:
-- Tailwind CSS (tailwind.config.js) is used for styling
+- AI modal: HuggingFace - prithivMLmods/deepfake-detector-model-v1
+- SStyling: Tailwind CSS (tailwind.config.js)
   
 ## Setup Instructions
 1. Clone Github repos to code editor such as visual studio code
