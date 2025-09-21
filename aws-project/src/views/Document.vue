@@ -200,8 +200,10 @@
                     <select 
                       v-model="selectedAnalysisSection" 
                       @change="activeTab = selectedAnalysisSection"
-                      class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF9900] focus:border-[#FF9900] transition-colors bg-white"
-                    >
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg 
+                            focus:outline-none focus:ring-2 focus:ring-[#FF9900] 
+                            focus:border-[#FF9900] transition-colors bg-white 
+                            appearance-none">
                       <option 
                         v-for="section in tabs" 
                         :key="section.id" 
