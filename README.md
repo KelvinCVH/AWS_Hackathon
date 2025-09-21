@@ -39,8 +39,8 @@ AI-Content-Detector-on-AWS. An AI-powered system built with AWS services that de
 - Amazon Cloudwatch 
 
 ### Other:
-- AI modal: HuggingFace - prithivMLmods/deepfake-detector-model-v1
-- Styling: Tailwind CSS (tailwind.config.js)
+- **AI modal:** HuggingFace - prithivMLmods/deepfake-detector-model-v1
+- **Styling:** Tailwind CSS (tailwind.config.js)
   
 ## Setup Instructions
 1. Clone Github repos to code editor such as visual studio code
