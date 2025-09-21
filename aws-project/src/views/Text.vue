@@ -8,7 +8,7 @@
           <textarea
             v-model="inputText"
             placeholder="Paste or type your text here..."
-            class="w-full h-96 p-4 border border-gray-300 rounded-lg resize-none
+            class="w-full h-96 p-4 border border-gray-400 rounded-lg resize-none
                    focus:ring-2 focus:ring-[#FF9900] focus:border-transparent"
             @input="resetResults"
           ></textarea>
