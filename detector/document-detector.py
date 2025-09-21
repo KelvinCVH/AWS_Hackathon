@@ -1089,6 +1089,30 @@ def analyze_existing_document(bucket_name, object_key):
             logger.error(f"Failed S3 write: {str(e)}")
 
         # Enhanced response with comprehensive analysis
+        # Simplified analysis for user-friendly display (4 key metrics)
+        simplified_analysis = {
+            "writing_style": {
+                "score": linguistic_features.get("perplexity", 50),
+                "description": "How natural and varied the writing appears",
+                "indicator": "Natural" if linguistic_features.get("perplexity", 50) < 40 else "Formal"
+            },
+            "personal_touch": {
+                "score": linguistic_features.get("human_score", 50),
+                "description": "Evidence of personal experience and emotion",
+                "indicator": "Personal" if linguistic_features.get("human_score", 50) > 60 else "Generic"
+            },
+            "content_specificity": {
+                "score": len(key_phrases) * 10,  # Convert to percentage
+                "description": "Use of specific details and concrete information",
+                "indicator": "Specific" if len(key_phrases) > 3 else "Vague"
+            },
+            "language_complexity": {
+                "score": linguistic_features.get("complexity_variation", 50),
+                "description": "Variation in sentence structure and vocabulary",
+                "indicator": "Varied" if linguistic_features.get("complexity_variation", 50) > 60 else "Uniform"
+            }
+        }
+
         response_body = {
             "document_id": item["id"],
             "object_key": object_key,
@@ -1100,14 +1124,8 @@ def analyze_existing_document(bucket_name, object_key):
             "text_length": len(extracted_text),
             "extraction_method": extraction_method,
             "input_text": extracted_text[:1000],
-            "analysis_version": "document_v4_enhanced",
-            "comprehend_analysis": comprehend_analysis,
-            "linguistic_features": linguistic_features,
-            "detection_breakdown": {
-                "linguistic_score": linguistic_features.get("perplexity", 50),
-                "ensemble_score": ensemble_score,
-                "confidence_level": "high" if ai_score < 20 or ai_score > 80 else "medium"
-            }
+            "analysis_version": "document_v4_simplified",
+            "simplified_analysis": simplified_analysis
         }
 
         return {

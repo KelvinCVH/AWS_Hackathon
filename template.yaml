@@ -115,6 +115,60 @@ Resources:
           DATA_REGION: !Ref "AWS::Region"
           BUCKET_NAME: "ai-detection-documents"
 
+  # Image Detector Function
+  ImageDetectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: detector/
+      Handler: image-detector.lambda_handler
+      Runtime: python3.11
+      Timeout: 300
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource: "*"
+        - Statement:
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+            Resource: !GetAtt ContentDetectionsTable.Arn
+        - Statement:
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:HeadObject
+              - s3:PutObject
+              - s3:PutObjectAcl
+            Resource: 
+              - "arn:aws:s3:::ai-detection-images/*"
+        - Statement:
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: 
+              - "arn:aws:s3:::ai-detection-images"
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /process-image
+            Method: post
+        ApiOptions:
+          Type: Api
+          Properties:
+            Path: /process-image
+            Method: options
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ContentDetectionsTable
+          BEDROCK_REGION: "us-east-1"
+          DATA_REGION: "ap-southeast-5"
+          BUCKET_NAME: "ai-detection-images"
+
   # DynamoDB Table
   ContentDetectionsTable:
     Type: AWS::DynamoDB::Table
@@ -141,9 +195,17 @@ Outputs:
     Description: "API Gateway endpoint URL for Document Detector function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/process-document"
 
+  ImageDetectorApiUrl:
+    Description: "API Gateway endpoint URL for Image Detector function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/process-image"
+
   DocumentsBucketName:
     Description: "S3 bucket name for document storage"
     Value: "ai-detection-documents"
+
+  ImagesBucketName:
+    Description: "S3 bucket name for image storage"
+    Value: "ai-detection-images"
 
   DynamoDBTableName:
     Description: "DynamoDB table name for storing analysis results"
