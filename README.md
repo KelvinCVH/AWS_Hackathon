@@ -31,21 +31,21 @@ An AI-powered system built with AWS services that detects whether text, document
   
 ### Cloud Services - AWS (Amazon Web Services): 
 - Amazon API Gateway:
- - Provides a secure public API for the UI to send image requests.
+  - Provides a secure public API for the UI to send image requests.
 - Amazon Lambda:
- - Lightweight backend logic that connects the UI with AI services.
+  - Lightweight backend logic that connects the UI with AI services.
 - Amazon Comprehend:
- - Analyzes text metadata (captions/descriptions) for sentiment and insights.
+  - Analyzes text metadata (captions/descriptions) for sentiment and insights.
 - Amazon Bedrock (Nova Pro):
- - Generates advanced AI text responses/explanations.
+  - Generates advanced AI text responses/explanations.
 - Amazon SageMaker:
- - Hosts and serves the HuggingFace deepfake-detector model (prithivMLmods/deepfake-detector-model-v1) for image classification.
+  - Hosts and serves the HuggingFace deepfake-detector model (prithivMLmods/deepfake-detector-model-v1) for image classification.
 - Amazon S3:
- - Stores input media like documents and images and also processed results.
+  - Stores input media like documents and images and also processed results.
 - Amazon DynamoDB:
- - Saves detection results, metadata, and user activity logs.
+  - Saves detection results, metadata, and user activity logs.
 - Amazon CloudWatch:
- - Monitors logs, errors, and performance for the entire system.
+  - Monitors logs, errors, and performance for the entire system.
   
 ## Setup Instructions
 1. Clone Github repos to code editor such as visual studio code
