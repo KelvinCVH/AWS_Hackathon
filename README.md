@@ -47,7 +47,11 @@ AI-Content-Detector-on-AWS. An AI-powered system built with AWS services that de
 1. Clone Github repos to code editor such as visual studio code
 2. Open terminal, the terminal will show path like (C:\Users\user\source\repos >)
 3. Run command below
+
 > cd AWS_Hackathon
+> 
 > cd aws-project
+> 
 > npm run dev
+
 4. Ctrl + click the local link or copy+paste the link to web browser
