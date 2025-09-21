@@ -35,7 +35,7 @@ AI-Content-Detector-on-AWS. An AI-powered system built with AWS services that de
 - Amazon Comprehend: Analyzes text metadata (captions/descriptions) for sentiment and insights.
 - Amazon Bedrock (Nova Pro): Generates advanced AI text responses/explanations.
 - Amazon SageMaker: Hosts and serves the HuggingFace deepfake-detector model for image classification.
-- Amazon S3: Stores input media like images and processed results.
+- Amazon S3: Stores input media like documents and images and also processed results.
 - Amazon DynamoDB: Saves detection results, metadata, and user activity logs.
 - Amazon CloudWatch: Monitors logs, errors, and performance for the entire system.
   
