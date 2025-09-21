@@ -291,21 +291,6 @@
             </div>
           </div>
 
-          <!-- Quick Stats -->
-          <div class="grid grid-cols-3 gap-4">
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Model Used</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.modelInfo?.name || 'ARTID' }}</p>
-            </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Confidence</p>
-              <p class="text-xl font-bold text-gray-800">{{ Math.round(results.confidence * 100) }}%</p>
-            </div>
-            <div class="bg-white rounded-lg border p-4 text-center">
-              <p class="text-xs text-gray-600 mb-1">Analysis Version</p>
-              <p class="text-xl font-bold text-gray-800">{{ results.analysisVersion || 'v1.0' }}</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -313,7 +298,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const selectedImage = ref(null)
 const imagePreview = ref('')
@@ -417,7 +402,7 @@ const resetResults = () => {
 }
 
 // API configuration
-const API_URL = process.env.VUE_APP_IMAGE_API_URL || "https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/Prod/process-image"
+const API_URL = import.meta.env.VUE_APP_IMAGE_API_URL || "https://bbi2604f92.execute-api.ap-southeast-5.amazonaws.com/Prod/process-image"
 
 const generateUniqueFileName = (originalName) => {
   const timestamp = Date.now()

@@ -474,10 +474,15 @@ def analyze_with_nova_pro(text, bedrock):
     else:
         ensemble_score = 50
     
-    # Combine explanations for comprehensive analysis
+    # Combine explanations for comprehensive analysis (limit to 150 words)
     final_explanation = " | ".join(filter(None, explanations[:2]))
     if len(final_explanation) > 1500:
         final_explanation = final_explanation[:1497] + "..."
+    
+    # Further limit to 150 words for AI Detection
+    words = final_explanation.split()
+    if len(words) > 150:
+        final_explanation = " ".join(words[:150]) + "..."
     
     return ensemble_score, final_explanation
 
